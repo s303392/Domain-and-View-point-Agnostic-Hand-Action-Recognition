@@ -10,6 +10,7 @@ import os
 import numpy as np
 from sklearn.model_selection import StratifiedKFold
 
+#load_data.py è responsabile del caricamento dei dati grezzi dalle annotazioni originali (MSRA dataset)
 
 path_dataset = './datasets/MSRA/cvpr15_MSRAHandGestureDB'
 subjects = [ 'P{}'.format(i) for i in range(9)]  

@@ -127,3 +127,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Added to ignore dataset and pretrained models
+datasets/F-PHAB/
+pretrained_models/

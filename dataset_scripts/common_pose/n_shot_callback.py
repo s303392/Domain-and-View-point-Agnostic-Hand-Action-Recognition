@@ -100,6 +100,19 @@ def knn_mix_callback(mix_log_keys, writer):
     return eval_mix
 
 
+def knn_mix_callback_single_dataset(mix_log_keys, writer):
+    def eval_mix(epoch, logs):
+        with writer.as_default():
+            for new_key, k1 in mix_log_keys.items():
+                v1 = logs.get(k1)
+                if v1 is not None:
+                    new_value = v1
+                    logs[new_key] = new_value
+                    tf.summary.scalar(new_key, data=new_value, step=epoch)
+        writer.flush()  
+    return eval_mix
+
+
 def knn_callback(model, model_params, dataset_name, knn_files, writer):
     
     np.random.seed(0)
@@ -133,4 +146,26 @@ def knn_callback(model, model_params, dataset_name, knn_files, writer):
     return eval_knn
 
 
+def knn_callback_single_dataset(model, model_params, dataset_name, knn_files, writer):
+    np.random.seed(0)
+    data_gen = DataGenerator(**model_params)
+    
+    annotations = { k:open(anns_file, 'r').read().splitlines() for k, anns_file in knn_files.items() }
+    anns_files = { k:[ l.split()[0] for l in anns ] for k, anns in annotations.items() }
+    labels_dict = { k:[ l.split()[1] for l in anns ] for k, anns in annotations.items() }
+    
+    samples_dict = { k:[ data_gen.get_pose_data_v2(data_gen.load_skel_coords(l), validation=True) for l in anns ] for k, anns in anns_files.items() }
+    samples_dict = { k:pad_sequences(samples, abs(model_params['max_seq_len']), dtype='float32', padding='pre') for k,samples in samples_dict.items() }
+        
+    def eval_knn(epoch, logs):
+        knn_res = get_knn_classification(model, samples_dict, labels_dict)
 
+        with writer.as_default():
+            for n in knn_neighbors:
+                acc = knn_res[n]
+                k = 'knn_{}_{}'.format(dataset_name, n).replace('-', '_')
+                logs.update(**{k: acc})
+                tf.summary.scalar(k, data=acc, step=epoch)
+            writer.flush()  
+
+    return eval_knn
