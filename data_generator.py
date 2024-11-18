@@ -27,7 +27,7 @@ Visualizar rotaciones
 
 """
 
-
+#index, middle, ring, pinky
 class DataGenerator():
 
     def __init__(self, 
@@ -407,7 +407,7 @@ class DataGenerator():
         return pose_features
     
     
-        
+
     # Triplet data generator -> genera batch di dati per l'addestramento. Ogni batch è composto da
     #campioni di diverse classi. La funzione legge le annotazioni, carica i dati delle pose, applica
     #trasformazioni e augmentazioni e prepara i batch di dati.
