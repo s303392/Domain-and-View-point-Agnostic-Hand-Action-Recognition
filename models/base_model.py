@@ -21,14 +21,14 @@ class Base_CLF_Model(Model):
         
         print(' **', backbone_model_name, '**')
         if "tcn_contr" in backbone_model_name:
-            print('Creating TCN Contrastive')
+            print('Creating TCN_contr backbone')
             from models.autoencoder_tcn import TCN_Contrastive
             self.backbone = TCN_Contrastive(**backbone_params)
         # elif "resnet_contr" in backbone_model_name:
         #     print('Creating ResNet Contrastive')
         #     backbone = ResNetEncoder(**backbone_params)
         elif "tcn_att" in backbone_model_name:
-            print('Creating TCN_Att')
+            print('Creating TCN_Att backbone')
             from models.TCN_Att import TCN_Att
             self.backbone = TCN_Att(**backbone_params)
         else:

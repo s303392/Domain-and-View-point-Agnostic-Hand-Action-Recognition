@@ -23,7 +23,8 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 import numpy as np
 
 
-
+#estende la classe Model di Keras e definisce un modello 
+# di rete neurale con TCN e attenzione.
 
 class TCN_Att(Model):
     def __init__(self, num_feats, conv_params, 
@@ -85,6 +86,7 @@ class TCN_Att(Model):
         l.return_sequences = True
         self.use_attention = True
         
+        #summarization module
         if att_layers is not None and len(att_layers) > 0:
             # Attention block. TCN returns all embeddings. By default attention mis them to return just one
        
@@ -107,7 +109,7 @@ class TCN_Att(Model):
             # self.use_attention = False
         
        
-        
+    # calcola la media pesata delle sequenze utilizzando il meccanismo di attenzione
     def compute_weighted_average(self, x):
         mean_weights = self.att_dense(x)
         
@@ -116,7 +118,9 @@ class TCN_Att(Model):
         x = x*mean_weights[:,:,None]
         x = tf.reduce_mean(x,axis=1)
         return mean_weights, x
-
+    
+    #esegue il forward pass del modello, applicando l'encoder TCN,
+    # i blocchi di rappresentazione e attenzione, e normalizzando l'output
     def call(self, x, return_att_weights=False):
         x = self.encoder_net(x)
         
@@ -142,8 +146,12 @@ class TCN_Att(Model):
             # if self.use_attention: return res[0]
             # else: return res[0]
         
+    #se return_sequence è True, il livello TCN restituisce l'intera sequenza di output
     def set_encoder_return_sequences(self, return_sequences):
         if return_sequences: self.use_attention = False
+        # Quando si restituisce l'intera sequenza, ogni elemento della sequenza 
+        # di output è già disponibile e non è necessario calcolare 
+        # pesi di attenzione per combinare gli elementi della sequenza.
         else: self.use_attention = True
         
 
@@ -265,7 +273,7 @@ if __name__ == '__main__':
     model.summary()
     if model.att_dense is not None: model.layers[-1].summary()
 
-    # print([ (l, l.activation for l in model.att_dense.layers ])
+    # print([ (l, l.activation for l in model.att_dense.layers) ])
     # print([ l for l in model.att_dense.layers ])
 
     model.compile(

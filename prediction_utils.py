@@ -64,10 +64,11 @@ def load_model(path_model, return_sequences=True, num_file=None, loss_name=None)
         model = TCN_Att(**model_params)
     elif "tcn_att" in model_params['model_name']:
         from models.TCN_Att import TCN_Att
-        print('Creating TCN Contrastive')
+        print('Creating TCN Att')
         model = TCN_Att(**model_params)
     elif "base_tcb_clf" in model_params['model_name']:
         from models.base_model import Base_CLF_Model
+        print('Creating Base_CLF_Model')
         model = Base_CLF_Model(model_params['backbone_model_name'], model_params['backbone_params'], 
                                model_params['clf_layers'], model_params['out_dim'], 
                                backbone_weights=model_params['backbone_weights'])

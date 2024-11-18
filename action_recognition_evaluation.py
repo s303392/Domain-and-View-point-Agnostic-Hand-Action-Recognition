@@ -6,8 +6,7 @@ Created on Thu Jan 14 10:19:18 2021
 @author: asabater
 """
 
-import os
-
+import random
 import os
 import pickle
 import numpy as np
@@ -21,12 +20,14 @@ from sklearn.metrics import accuracy_score
 from data_generator import DataGenerator
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
-
+#file progettato per valutare le prestazioni del modello.
 
 knn_neighbors = [1,3,5,7,9,11]
 # aug_loop = [0,10,20,40]
 aug_loop = [0,40]
-num_augmentations = max(aug_loop)
+num_augmentations = max(aug_loop) 
+#num_augmentations: si riferisce al numero di versioni augmentate 
+# delle sequenze di azioni originali 
 weights = 'distance'
 
 crop_train = 80000
@@ -35,43 +36,44 @@ crop_test = np.inf
 np.random.seed(0)
 
 
-
+#funzione che valuta le prestazioni del modello su diversi foldi di dati utilizzando
+# un classificatore k-NN.
 def evaluate_folds(folds_data, embs, total_labels, num_augmentations=0, embs_aug=None, 
                    evaluate_all_folds=True, leave_one_out=True, groupby=None, return_sequences=False):
     
     res = {}
+    all_preds = {}
+    all_true = {}
     num_folds = len(folds_data) if evaluate_all_folds else 1
+    print(f"Number of folds: {num_folds}")
+
     for num_fold in range(num_folds):
         if leave_one_out:
-            train_indexes =  np.concatenate([ f['indexes'] for i,f in folds_data.items() if i!= num_fold])
+            train_indexes =  np.concatenate([ f['indexes'] for i,f in enumerate(folds_data) if i != num_fold])
             test_indexes = folds_data[num_fold]['indexes']
+            print(f"Fold {num_fold} (leave_one_out=True) - Number of test sequences: {len(test_indexes)}")
         else:
             train_indexes = folds_data[num_fold]['indexes']
-            test_indexes =  np.concatenate([ f['indexes'] for i,f in folds_data.items() if i!= num_fold])
-
-
+            test_indexes =  np.concatenate([ f['indexes'] for i,f in enumerate(folds_data) if i != num_fold])
+            print(f"Fold {num_fold} (leave_one_out=False) - Number of test sequences: {len(test_indexes)}")
         X_train = embs[train_indexes]
         X_test = embs[test_indexes]
         y_train = total_labels[train_indexes]
         y_test = total_labels[test_indexes]
         
-        
         if groupby is not None:
             _, groups_test_true = groupby[train_indexes], groupby[test_indexes]
             
-            
-        if num_augmentations>0:
+        if num_augmentations > 0:
             X_train = np.concatenate([X_train] + [ embs_aug[i][train_indexes] for i in range(num_augmentations) ])
             y_train = np.concatenate([ y_train for i in range(num_augmentations+1) ])
  
-            
         if return_sequences:
             if groupby is not None: groups_test_true = np.array([ y for y,seq in zip(groups_test_true, X_test) for _ in range(len(seq)) ])
             y_train = [ y for y,seq in zip(y_train, X_train) for _ in range(len(seq)) ]
             y_test = [ y for y,seq in zip(y_test, X_test) for _ in range(len(seq)) ]
             X_train = np.concatenate(X_train)
             X_test = np.concatenate(X_test)
-            
             
         if groupby is not None and len(y_test) > crop_test:
             print('Cropping test results:', len(y_test))
@@ -80,13 +82,14 @@ def evaluate_folds(folds_data, embs, total_labels, num_augmentations=0, embs_aug
             X_test = X_test[idx]
             groups_test_true = groups_test_true[idx]
  
-
         if len(y_train) > crop_train: 
             idx = np.random.choice(np.arange(len(y_train)), crop_train, replace=False)
             X_train = X_train[idx]
             y_train = np.array(y_train)[idx]
 
         res[num_fold] = {}
+        all_preds[num_fold] = {}
+        all_true[num_fold] = {}
         knn = KNeighborsClassifier(n_neighbors=1, n_jobs=8, weights=weights).fit(X_train, y_train)
         for n in knn_neighbors:
             knn = knn.set_params(**{'n_neighbors': n})
@@ -108,6 +111,8 @@ def evaluate_folds(folds_data, embs, total_labels, num_augmentations=0, embs_aug
             else: 
                 preds = knn.predict(X_test)
                 acc = accuracy_score(y_test, preds)
+                all_preds[num_fold][n] = preds
+                all_true[num_fold][n] = y_test
             res[num_fold][n] = acc
             tf = time.time()
             print(' ** Classification time ** num_fold [{}] | k [{}] | X_test [{}] | time [{:.3f}s] | ms per sequence [{:.3f}]'.format(num_fold, n, 
@@ -115,25 +120,25 @@ def evaluate_folds(folds_data, embs, total_labels, num_augmentations=0, embs_aug
 
     res = { n:np.mean([ res[num_fold][n] for num_fold in range(num_folds) ]) for n in knn_neighbors }
     
-
-    return res
+    return res, all_preds, all_true
         
-
-
-
-
 # %%
 
 # =============================================================================
 # F-PHAB
 # =============================================================================
 
+#carica i dati del dataset F-PHAB, inclusi le annotazioni e i fold di valutazione
 def load_fphab_data():
-    # Load all annotations
+    # Load all annotations dal file total_annotations_jn20.txt, il quale contiene:
+    # per ogni riga una sequenza di azione: percorso del file di scheletro e id azione
     annotations_store_folder = './dataset_scripts/F_PHAB/paper_tables_annotations'
     with open(os.path.join(annotations_store_folder, 'total_annotations_jn{}.txt'.format(20)), 'r') as f: 
         total_annotations = f.read().splitlines()
     total_labels = np.stack([ l.split()[-1] for l in total_annotations ])
+    #Format of each line of skeleton.txt: t x_1 y_1 z_1 x_2 y_2 z_2 ... x_21 y_21 z_21
+    #where t is the frame number and x_i y_i z_i are the world coordinates (in mm) of joint i at frame t.
+    
     total_annotations = [ l.split()[0] for l in total_annotations ]
     
     
@@ -146,6 +151,7 @@ def load_fphab_data():
 
 from joblib import Parallel, delayed
 
+#genera le sequenze di azioni utilizzando il DataGenerator
 def load_actions_sequences_data_gen(total_annotations, num_augmentations, model_params, load_from_files=True, return_sequences=False):
     np.random.seed(0)
     data_gen = DataGenerator(**model_params)
@@ -163,6 +169,7 @@ def load_actions_sequences_data_gen(total_annotations, num_augmentations, model_
     print('* Data sequences loaded')
     
     if num_augmentations > 0:
+        #
         action_sequences_augmented = Parallel(n_jobs=8)(delayed(get_pose_features)(validation=False) for i in tqdm(range(num_augmentations)))
         print('* Data sequences augmented')
     else: action_sequences_augmented = None
@@ -174,6 +181,8 @@ def load_actions_sequences_data_gen(total_annotations, num_augmentations, model_
 def get_tcn_embeddings(model, action_sequences, action_sequences_augmented, return_sequences=False):
     t = time.time()
     
+    #con False si utilizza il meccanismo di attenzione -> 
+    # viene restituito solo l'ultimo elemento della sequenza
     model.set_encoder_return_sequences(return_sequences)
     # Get embeddings from all annotations
     if return_sequences: 
@@ -208,29 +217,75 @@ def get_tcn_embeddings(model, action_sequences, action_sequences_augmented, retu
 
 def evaluate_fphab(aug_loop, folds_base, folds_1_1, folds_subject, embs, embs_aug, total_labels, knn_neighbors):
     total_res = {}
+    all_preds = {}
+    all_true = {}
     for n_aug in aug_loop:
         total_res[n_aug] = {}
+        all_preds[n_aug] = {}
+        all_true[n_aug] = {}
         print(n_aug, '1:3')
-        total_res[n_aug]['1:3'] = evaluate_folds(folds_base, embs, total_labels, num_augmentations=n_aug, embs_aug=embs_aug, leave_one_out=False)
+        total_res[n_aug]['1:3'], all_preds[n_aug]['1:3'], all_true[n_aug]['1:3'] = evaluate_folds(folds_base, embs, total_labels, num_augmentations=n_aug, embs_aug=embs_aug, leave_one_out=False)
         print(n_aug, '1:1')
-        total_res[n_aug]['1:1'] = evaluate_folds(folds_1_1, embs, total_labels, num_augmentations=n_aug, embs_aug=embs_aug, leave_one_out=False, evaluate_all_folds=False)
+        total_res[n_aug]['1:1'], all_preds[n_aug]['1:1'], all_true[n_aug]['1:1'] = evaluate_folds(folds_1_1, embs, total_labels, num_augmentations=n_aug, embs_aug=embs_aug, leave_one_out=False, evaluate_all_folds=False)
         print(n_aug, '3:1')
-        total_res[n_aug]['3:1'] = evaluate_folds(folds_base, embs, total_labels, num_augmentations=n_aug, embs_aug=embs_aug, leave_one_out=True)
+        total_res[n_aug]['3:1'], all_preds[n_aug]['3:1'], all_true[n_aug]['3:1'] = evaluate_folds(folds_base, embs, total_labels, num_augmentations=n_aug, embs_aug=embs_aug, leave_one_out=True)
         print(n_aug, 'cross_sub')
-        total_res[n_aug]['cross_sub'] = evaluate_folds(folds_subject, embs, total_labels, num_augmentations=n_aug, embs_aug=embs_aug, leave_one_out=True)
+        total_res[n_aug]['cross_sub'], all_preds[n_aug]['cross_sub'], all_true[n_aug]['cross_sub'] = evaluate_folds(folds_subject, embs, total_labels, num_augmentations=n_aug, embs_aug=embs_aug, leave_one_out=True)
 
-    return total_res
-
-
+    return total_res, all_preds, all_true
+ 
+#totale_res = {
+   # 0: {  # No augmentations
+   #     '1:3': { ... },
+   #     '1:1': { ... },
+   #    '3:1': { ... },
+   #     'cross_sub': { ... }
+   # },
+   # 40: {  # With augmentations
+   #     '1:3': { ... },
+   #     '1:1': { ... },
+   #     '3:1': { ... },
+   #     'cross_sub': { ... }
+   # }
+#}
+                            
+#total_res[0].keys() -> (['1:3', '1:1', '3:1', 'cross_sub'])
 def print_results(dataset_name, total_res, knn_neighbors, aug_loop, frame=True):
     if frame: print('-'*81)
-    print('# | {} | {}'.format(dataset_name,
-            ' | '.join([ '[{}] {:.1f} / {:.1f}'.format(k, max([ total_res[0][k][n] for n in knn_neighbors ])*100,
-              max([ total_res[na][k][n] for n in knn_neighbors for na in aug_loop ])*100) for k in total_res[0].keys() ])
+    results = []
+    for k in total_res[0].keys():
+        max_acc = max((total_res[0][k][n], n) for n in knn_neighbors)
+        max_aug_acc = max((total_res[na][k][n], n) for n in knn_neighbors for na in aug_loop)
+        results.append('[{}] {:.1f} (k={}) / {:.1f} (k={})'.format(
+            k, max_acc[0]*100, max_acc[1], max_aug_acc[0]*100, max_aug_acc[1]
         ))
+    print('# | {} | {}'.format(dataset_name, ' | '.join(results)))
     if frame: print('-'*81)
     
-    
+
+def print_model_details(model_params):
+    print("Model details of the model:")
+    for key, value in model_params.items():
+        print(f"{key}: {value}")
+
+
+def create_action_mapping(file_path):
+    action_mapping = {}
+    with open(file_path, 'r') as f:
+        lines = f.readlines()
+        for line in lines:
+            if line.startswith('Training') or line.startswith('Test'):
+                continue
+            parts = line.strip().split()
+            action_name = parts[0].split('/')[1]  # Prendi solo il nome dell'azione
+            action_number = int(parts[-1])
+            if action_number not in action_mapping:
+                action_mapping[action_number] = action_name
+    return action_mapping
+
+def get_action_name(action_mapping, action_number):
+    return action_mapping.get(action_number, "Unknown")
+
 # %%
 
 # =============================================================================
@@ -356,8 +411,12 @@ if __name__ == '__main__':
     model_params['use_rotations'] = None
     
     print('* Model loaded')
+
+    print_model_details(model_params)
     
-    
+    file_path = 'C:/Users/filip/Desktop/Politecnico/INGEGNERIA/TESI_loc/Sabater/Domain-and-View-point-Agnostic-Hand-Action-Recognition/datasets/F-PHAB/data_split_action_recognition.txt'
+    a_mapping_fphab = create_action_mapping(file_path)
+    #print(a_mapping_fphab) #{num_action: name_action, ..}
 
     # %%
     
@@ -365,15 +424,54 @@ if __name__ == '__main__':
     if args.eval_fphab:
         t = time.time()
         total_annotations, total_labels, folds_1_1, folds_base, folds_subject = load_fphab_data()
+        print('Len total labels:{}', len(total_labels))#1175
+        print('Len fold_1_1:{}', len(folds_1_1))#2
+        print('Len fold_base:{}', len(folds_base))#3
+        print('Len fold_subject:{}', len(folds_subject))#6
         action_sequences, action_sequences_augmented = load_actions_sequences_data_gen(total_annotations, num_augmentations, model_params)
+        print('Len action sequences:{}', len(action_sequences))#1175
+        print(f"Shape action sequence: {action_sequences[0].shape}")#(32,54) #(frame, feature)
+        print('Len action sequences augmented:{}', len(action_sequences_augmented))#10
+        print(f"Shape action sequence aug: {action_sequences_augmented[0].shape}")#(1175,32,54) -> feature = (7 x 3 relative hand coordinates, 7 x 3 coordinate difference features, and 6 x 2 bone angle differences)
         embs, embs_aug = get_tcn_embeddings(model, action_sequences, action_sequences_augmented)
-        total_res_fphab = evaluate_fphab(aug_loop, folds_base, folds_1_1, folds_subject, embs, embs_aug, total_labels, knn_neighbors)
-        print_results('F-PHAB   ', total_res_fphab, knn_neighbors, aug_loop)
+        print('Len embs:{}', len(embs))#1175
+        print('Len embs_aug:{}', len(embs_aug))#10 (vettore con 10 embs augmentati)
+        total_res_fphab, all_preds_fphab, all_true_fphab = evaluate_fphab(aug_loop, folds_base, folds_1_1, folds_subject, embs, embs_aug, total_labels, knn_neighbors)
+        #print_results('F-PHAB   ', total_res_fphab, knn_neighbors, aug_loop)
+        
+        # Stampa un esempio di predizione con il nome dell'azione e la sua etichetta corretta
+        for n_aug in all_preds_fphab:
+            for fold_type in all_preds_fphab[n_aug]:
+                for fold in all_preds_fphab[n_aug][fold_type]:
+                    for k in all_preds_fphab[n_aug][fold_type][fold]:
+                        preds = all_preds_fphab[n_aug][fold_type][fold][k]
+                        true_labels = all_true_fphab[n_aug][fold_type][fold][k]
+                        if len(preds) > 0:
+                            i = random.choice(range(len(preds)))  # Seleziona un indice casuale
+                            pred_action_name = get_action_name(a_mapping_fphab, int(preds[i]))
+                            true_action_name = get_action_name(a_mapping_fphab, int(true_labels[i]))
+                            print(f"Predizione: {pred_action_name}, Etichetta corretta: {true_action_name}")
+                        break
+                    break
+                break
+            break
+                        
+        # for n_aug in all_preds_fphab:
+        #     print(f"Augmentation: {n_aug}")
+        #     for fold_type in all_preds_fphab[n_aug]:
+        #         print(f"  Fold type: {fold_type}")
+        #         for fold in all_preds_fphab[n_aug][fold_type]:
+        #             print(f"    Fold: {fold}")
+        #             for k in all_preds_fphab[n_aug][fold_type][fold]:
+        #                 print(f"      k={k}: {len(all_preds_fphab[n_aug][fold_type][fold][k])}")
+        
         print('Time elapsed: {:.2f}'.format((time.time()-t)/60))
-        del embs; del embs_aug; del action_sequences; del action_sequences_augmented;
+        #print('Lunghezza total_res:{}', len(total_res_fphab))#2 (per gli aug_loop che è [0,10])
+        
+
+        del embs; del embs_aug; del action_sequences; del action_sequences_augmented
     
     # %%
-    
     # SHREC
     if args.eval_shrec:
         t = time.time()
@@ -386,10 +484,7 @@ if __name__ == '__main__':
         
         del embs; del embs_aug; del action_sequences; del action_sequences_augmented;
     
-    
-    
     # %%
-    
     # MSRA full -> return_sequences == True
     if args.eval_msra:
         t = time.time()
@@ -407,7 +502,6 @@ if __name__ == '__main__':
         print('Time elapsed: {:.2f}'.format((time.time()-t)/60))
         del embs; del embs_aug; del action_sequences; del action_sequences_augmented;
 
-
     # %%
     
     print('='*80)
@@ -422,8 +516,3 @@ if __name__ == '__main__':
     print(args.loss_name, args.path_model)
     
 # %%
-
-
-
-
-

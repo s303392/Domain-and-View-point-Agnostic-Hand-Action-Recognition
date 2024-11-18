@@ -35,8 +35,8 @@ class DataGenerator():
                     scale_by_torso, temporal_scale, 
                     use_rotations,
                     
-                    use_relative_coordinates,
-                    use_jcd_features, use_coord_diff,
+                    use_relative_coordinates, 
+                    use_jcd_features, use_coord_diff, 
                     # use_coords_raw, use_coords, use_jcd_diff, 
                     use_bone_angles,                # use_bone_angles_cent,
                     use_bone_angles_diff,
@@ -151,6 +151,9 @@ class DataGenerator():
         self.skip_frames = skip_frames
         
         self.connecting_joint = connecting_joint
+#Indice 0: L'articolazione 0 (polso) è connessa all'articolazione 2.
+#Indice 1: L'articolazione 1 (base del dito medio) è connessa all'articolazione 0 (polso).
+#Indici 2-6: Le articolazioni 2-6 (le punte delle dita) sono tutte connesse all'articolazione 1 (base del dito medio).
         if connecting_joint is not None: self.num_feats = self.get_num_feats()
         else: self.num_feats = None
         
@@ -160,11 +163,8 @@ class DataGenerator():
             print('Noise will be applied to training:', noise)
         else: self.add_coord_noise = False
         
-        
-        
 
-
-
+#carica le coordinate scheletriche da un file (seleziona 7 joint) e le trasforma in un array Numpy
     def load_skel_coords(self, filename):
         with open(filename, 'r') as f: skel = f.read().splitlines()
         skel = np.array(list(map(str.split, skel)))
@@ -174,6 +174,7 @@ class DataGenerator():
             skel = skel[:, self.min_common_joints, :]
         return skel        
 
+#scala le coordinate scheletriche in base alla distanza tra il polso e la base del dito
     def scale_skel(self, skel):
         torso_dists = np.linalg.norm(skel[:,self.middle_base_kp] - skel[:,self.wrist_kp], axis=1)     # length between wrist and middle finger base
         for i in range(skel.shape[0]): 
@@ -182,17 +183,18 @@ class DataGenerator():
         return skel
         
 
+#total feature 54 -> (7 x 3 relative hand coordinates, 7 x 3 coordinate difference features, and 6 x 2 bone angle differences)
     def get_num_feats(self):
         num_feats = 0
-        if self.use_bone_angles:
+        if self.use_bone_angles: 
             num_feats += (len(self.connecting_joint)-1)*2
-        if self.use_bone_angles_diff:
+        if self.use_bone_angles_diff: #6*2 - These features describe the rotation direction (with respect to the world coordinates) and rotation speed of each bone
             num_feats += (len(self.connecting_joint)-1)*2
-        if self.use_jcd_features:
+        if self.use_jcd_features: 
             num_feats += int(comb(self.joints_num,2))
-        if self.use_coord_diff:
+        if self.use_coord_diff: #7*3 - These features describe the translation direction and speed of each coordinate for each of the 3 axes
             num_feats += self.joints_num * self.joints_dim
-        if self.use_relative_coordinates:
+        if self.use_relative_coordinates: #7*3
             num_feats += self.joints_num * self.joints_dim
         return num_feats
   
@@ -214,6 +216,7 @@ class DataGenerator():
             p_new = p
         return p_new
 
+#vengono calcolate le differenze tra le coordinate delle articolazioni -> l'obiettivo è descrivere la struttura instantanea della mano
     def get_jcd_features(self, p, num_frames):
         # Get joint distances
         jcd = []
@@ -224,7 +227,8 @@ class DataGenerator():
             jcd.append(d_m)
         jcd = np.stack(jcd) 
         return jcd
-
+    
+#utili per calcolare gli angoli delle ossa
     def get_bone_spherical_angles(self, v):
         elevation = np.arctan2(v[:,2], np.sqrt(v[:,0]**2 + v[:,1]**2))
         azimuth = np.arctan2(v[:,1], v[:,0])
@@ -253,9 +257,13 @@ class DataGenerator():
         return np.matmul(skels, rot_matrix)
     
     # Move skels to the coordinate center. Coordinates relative to the palm center
+    # estrae le coordinate della base delle dite e poi quelle del polso per ogni frame e 
+    # calcola il punto medio che rappresenterà il centro del palmo
     def get_relative_coordinates(self, skels):
         skels_centers = (skels[:, self.middle_base_kp, :] + skels[:, self.wrist_kp, :])/2
-        return skels - np.expand_dims(skels_centers, axis=1)
+        return skels - np.expand_dims(skels_centers, axis=1) 
+    #Sottrae il centro del palmo dalle coordinate delle articolazioni, 
+    # rendendole relative al centro del palmo
         
     
     
@@ -264,7 +272,9 @@ class DataGenerator():
     def get_pose_data_v2(self, body, validation, rotation_matrix=None):
     
         # 1. Remove frames without predictions
-        body = body[np.all(~np.all(body==0, axis=2), axis=1)]        
+        body = body[np.all(~np.all(body==0, axis=2), axis=1)]
+        #body è un array di elementi che rappresentano un frame che contiene coordinate 3D 
+        # delle articolazioni della mano [num_frames, joints_num, joints_dim]        
 
 # =============================================================================
 # DATA AUGMENTATION
@@ -398,7 +408,10 @@ class DataGenerator():
     
     
         
-    # Triplet data generator
+    # Triplet data generator -> genera batch di dati per l'addestramento. Ogni batch è composto da
+    #campioni di diverse classi. La funzione legge le annotazioni, carica i dati delle pose, applica
+    #trasformazioni e augmentazioni e prepara i batch di dati.
+
     # Each batch is composed by K=4 samples of P=batch_size/K different classes
     # if max_seq_len == 0 -> samples inside a batch are zero-padded to fit their inner max length. 
     #                           Longer sequences are zoomed out to fit max_seq_len
