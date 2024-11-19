@@ -24,6 +24,9 @@ def supervised_nt_xent_loss(temperature=0.07, base_temperature=0.07):
     '''
     
     def loss(y, z):
+        #y = (etichette di classe)
+        #z = (embeddings dei campioni)
+
         y = y[:, 0]
         batch_size = tf.shape(z)[0]
         contrast_count = 1
@@ -33,10 +36,12 @@ def supervised_nt_xent_loss(temperature=0.07, base_temperature=0.07):
         # mask: contrastive mask of shape [bsz, bsz], mask_{i,j}=1 if sample j
         #     has the same class as sample i. Can be asymmetric.
         #la maschera viene utilizzata per identificare i campioni positivi (stessa classe)
-        # e negativi (classi diverse). mask[i,j] = 1 se i e j sono della stessa classe
-        # altrimenti = 0.
+        # mask[i,j] = 1 se i e j sono della stessa classe altrimenti = 0.
         mask = tf.cast(tf.equal(y, tf.transpose(y)), tf.float32)
 
+        #calcolo il prodotto scalare tra gli embeddings, diviso per la temperatura
+        # questo calcolo misura la similarità tra ogni coppia di campioni nel batch
+        # (un valore più alto indica una maggiore similarità)
         anchor_dot_contrast = tf.divide(
             tf.matmul(z, tf.transpose(z)),
             temperature
@@ -54,6 +59,7 @@ def supervised_nt_xent_loss(temperature=0.07, base_temperature=0.07):
 
         # compute mean of log-likelihood over positive
         mask_sum = tf.reduce_sum(mask, axis=1)
+
         # Aggiungi un controllo per evitare la divisione per zero
         mean_log_prob_pos = tf.where(
             mask_sum > 0,
@@ -61,7 +67,13 @@ def supervised_nt_xent_loss(temperature=0.07, base_temperature=0.07):
             tf.zeros_like(mask_sum)
         )
 
-        # loss
+        # calcolo la loss -> cerca di minimizzare le distanze tra ancora e positivo 
+        # e questo avviene perché la log-likelihood dei campioni positivi viene MASSIMIZZATA,
+        # il che implica che gli embeddings di campioni della stessa classe devono essere più simili 
+        # (distanza minore, valore di similarità alta)
+
+        #La loss è definita come il valore negativo della log-likelihood media dei campioni positivi, 
+        # quindi MASSIMIZZARE la log-likelihood equivale a minimizzare la loss.
         loss = -(temperature / base_temperature) * mean_log_prob_pos
         loss = tf.reduce_mean(loss)
 

@@ -438,7 +438,7 @@ class DataGenerator():
         
             # Reads the annotations and stores them into a dict by label. Annotations are shuffled
             def read_annotations():
-                pose_files = {}
+                pose_files = {} #le chiavi sono le etichette e i valori sono liste di nomi di file
                 with open(pose_annotations_file, 'r') as f: 
                     for line in f:
                         filename, label = line.split()
@@ -453,7 +453,8 @@ class DataGenerator():
             def get_random_sample(label):
                 if label in pose_files and len(pose_files[label]) > 0:
                     return pose_files[label].pop(), label
-                else:
+                else: 
+                #se non ci sono più campioni con quella etichetta, viene selezionata una nuova etichetta casuale
                     if label in pose_files: del pose_files[label]
                     new_label = np.random.choice(list(pose_files.keys()))
                     return get_random_sample(new_label)        
@@ -471,12 +472,17 @@ class DataGenerator():
             if validation:
                 batch_size = batch_size // K
                 K = 1
-    
+
+            #K = (numero di campioni per classe)
+            #P = (numero di classi per batch)
+            #sample_repetitions = (numero di ripetizioi per campione)
             assert batch_size % K == 0
             P = batch_size // K
             pose_files = read_annotations()
             print('*************', K, P, batch_size, self.use_rotations)
-            
+
+            #Con classification a true -> le etichette delle classi vengono convertite in una rappresentazione
+            # one-hot, e quest'ultime vengono aggiunte all'array Y.
             if classification:
                 total_labels = sorted(list(pose_files.keys()))
                 labels_dict = { l:i for i,l in enumerate(total_labels) }
@@ -498,6 +504,8 @@ class DataGenerator():
                
                 
                 # if triplet and triplet_individual_labels: label_ind: 0
+                #Se triplet è True -> vengono generati gruppi di campioni positivi e negativi per ogni classe
+                # utile per apprendere rappresentazioni discriminative
                 if triplet:
                     # Positive pairs rotated together must have the same label
                     # Samples not rotated, rotated equally within batch or rotated randomly must have the original label
@@ -552,6 +560,8 @@ class DataGenerator():
                 if triplet: 
                     batch_labels = np.stack(batch_labels)       # for triplets
                     triplet_labels = np.stack(triplet_labels)       # for triplets
+
+                #vedere sopra cosa comporta classification a true
                 if classification: y_clf = np.stack(y_clf).astype('int')              # for classification                
                     
                 X, Y, sample_weights = [], [], {}
@@ -560,6 +570,7 @@ class DataGenerator():
                 # if triplet: Y.append(batch_labels)
                 if triplet: Y.append(triplet_labels)
                 if classification: Y.append(y_clf)
+                #se decoder è True -> il generatore prepara i dati per un compito di decodifica sequenziale
                 if decoder:
                     decoder_data = [ bs[::-1] for bs in batch_samples ] if reverse_decoder else batch_samples
                     padding = 'pre' if is_tcn else 'post'
