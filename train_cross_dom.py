@@ -78,9 +78,9 @@ def main(model_params):
     
     dummy_inpt = np.random.rand(model_params['batch_size'], abs(model_params['max_seq_len']), model_params['num_feats']).astype('float32')
     print(' * dummy_shape:', dummy_inpt.shape)
-    dummy_pred = model(dummy_inpt);
+    dummy_pred = model(dummy_inpt)
     print(' * dummy_pred shape', [ p.shape for p in dummy_pred ])
-    dummy_emb = model.get_embedding(dummy_inpt);
+    dummy_emb = model.get_embedding(dummy_inpt)
     print(' * dummy_emb shape', dummy_emb.shape)
     
     

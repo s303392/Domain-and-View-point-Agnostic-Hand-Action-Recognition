@@ -92,7 +92,7 @@ class TCN_Att(Model):
        
             self.att_dense = []
             flattened = False
-            for layer_info in att_layers:
+            for layer_info in att_layers: #att_layers= ["conv64", -1]
                 if str(layer_info) == 'BatchNorm':
                     self.att_dense.append(BatchNormalization())
                 elif 'conv' in str(layer_info):
