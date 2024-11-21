@@ -41,6 +41,7 @@ class TCN_Att(Model):
         super(TCN_Att, self).__init__()
         
         if len(conv_params) == 6:
+            #nb_filters = 256 
             nb_filters, kernel_size, nb_stacks, use_skip_connections, padding, dilations = conv_params
             if type(dilations) == int: 
                 dilations = [dilations]
