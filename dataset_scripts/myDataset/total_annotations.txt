@@ -1,1 +1,0 @@
-./datasets/common_pose/myDataset/single_0_action_combined_skeleton_common_pose.txt 0
