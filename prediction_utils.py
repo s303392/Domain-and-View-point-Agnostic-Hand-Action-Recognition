@@ -60,7 +60,7 @@ def load_model(path_model, return_sequences=True, num_file=None, loss_name=None)
         # print('Creating TCN Contrastive')
         # model = TCN_Contrastive(**model_params)
         from models.TCN_Att import TCN_Att
-        print('Creating TCN Contrastive')
+        print('Creating TCN Contrastive') #-> nei parametri manca il "att_layers"
         model = TCN_Att(**model_params)
     elif "tcn_att" in model_params['model_name']:
         from models.TCN_Att import TCN_Att

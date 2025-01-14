@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+# -*- coding: utf -8 -*-
 """
-Created on Thu Jan 14 10:19:18 2021
+Created on Thu? Jan 14 10:19:18 2021
 
 @author: asabater
-"""
+""" 
 
 import random
 import os
@@ -286,6 +286,66 @@ def create_action_mapping(file_path):
 def get_action_name(action_mapping, action_number):
     return action_mapping.get(action_number, "Unknown")
 
+
+# SINGLE MY ACTION 
+
+def map_model_params_to_mygenerator_params(model_params):
+    gen_params = {
+        'max_seq_len': model_params.get('max_seq_len', -32),
+        'scale_by_torso': model_params.get('scale_by_torso', True),
+        'use_velocity_acceleration': model_params.get('use_velocity_acceleration', False),
+        'use_additional_features': model_params.get('use_additional_features', False),
+        'joints_format': model_params.get('joints_format', 'common_minimal'),
+        'temporal_scale': model_params.get('temporal_scale', (0.8, 1.2)),
+        'noise': model_params.get('noise', None),
+        'rotation_noise': model_params.get('rotation_noise', None),
+        'use_rotations': model_params.get('use_rotations', None),
+        'use_relative_coordinates': model_params.get('use_relative_coordinates', False),
+        'use_jcd_features': model_params.get('use_jcd_features', False),
+        'use_coord_diff': model_params.get('use_coord_diff', False),
+        'use_bone_angles': model_params.get('use_bone_angles', False),
+        'use_bone_angles_diff': model_params.get('use_bone_angles_diff', False),
+        'skip_frames': model_params.get('skip_frames', []),
+        'dataset': model_params.get('dataset', ''),
+    }
+    return gen_params
+
+def load_single_action_data(annotation_file, model_params):
+    gen_params = map_model_params_to_mygenerator_params(model_params)
+    with open(annotation_file, 'r') as f:
+        total_annotations = f.read().splitlines()
+    total_labels = np.stack([l.split()[-1] for l in total_annotations])
+    total_annotations = [l.split()[0] for l in total_annotations]
+    data_gen = DataGenerator(**gen_params)
+    action_sequences = []
+    for ann in total_annotations:
+        print(f"Loading skeleton coordinates from: {ann}")
+        skel_joints = data_gen.load_skel_coords(ann)
+        print(f"Skeleton joints shape: {skel_joints.shape}")
+        pose_data = data_gen.get_pose_data_v2(skel_joints, validation=True)
+        action_sequences.append(pose_data)
+    print(f"Action sequence len: {len(action_sequences)}")
+    action_sequences = pad_sequences(action_sequences, abs(model_params['max_seq_len']), dtype='float32', padding='pre')
+    return action_sequences, total_labels
+
+def get_embeddings(model, action_sequences):
+    action_sequences = pad_sequences(action_sequences, abs(model_params['max_seq_len']), dtype='float32', padding='pre')
+    action_sequences = np.array(action_sequences)
+    embs = model.get_embedding(action_sequences)
+    return embs
+
+def evaluate_single_action(single_embs, single_labels, reference_embs, reference_labels):
+    # combined_embs = np.concatenate([reference_embs, single_embs], axis=0)
+    # combined_labels = np.concatenate([reference_labels, single_labels], axis=0)
+
+    # print(f"Len combined_embs_0: {len(combined_embs)}")
+    # print(f"Len combined_labels_0: {len(combined_labels)}")
+
+    knn = KNeighborsClassifier(n_neighbors=5, n_jobs=8, weights='distance').fit(reference_embs, reference_labels)
+    preds = knn.predict(single_embs)
+    acc = accuracy_score(single_labels, preds)
+    return acc, preds, single_labels
+
 # %%
 
 # =============================================================================
@@ -381,9 +441,6 @@ def evaluate_MSRA(aug_loop, actions_label_sbj, folds, folds_subject, folds_subje
     return total_res
 
 
-
-# %%
-
 if __name__ == '__main__':
     # %%
 
@@ -405,12 +462,16 @@ if __name__ == '__main__':
     parser.add_argument('--eval_fphab', action='store_true', help='evaluate on F-PHAB splits')
     parser.add_argument('--eval_shrec', action='store_true', help='evaluate on SHREC splits')
     parser.add_argument('--eval_msra', action='store_true', help='evaluate on MSRA dataset')
+    parser.add_argument('--single_action', type=str, help='path to the annotation file for a single action')
     args = parser.parse_args()
 
     model, model_params = prediction_utils.load_model(args.path_model, False, loss_name = args.loss_name)
     model_params['use_rotations'] = None
     
     print('* Model loaded')
+
+    # model.build((None, abs(model_params['max_seq_len']), model_params['num_feats']))
+    # model.summary()
 
     print_model_details(model_params)
     
@@ -419,7 +480,36 @@ if __name__ == '__main__':
     #print(a_mapping_fphab) #{num_action: name_action, ..}
 
     # %%
-    
+
+    # SINGLE MY ACTION
+    if args.single_action:
+        single_action_sequences, single_action_labels = load_single_action_data(args.single_action, model_params)
+        single_action_embs = get_embeddings(model, single_action_sequences)
+       
+
+        #Carico i dati reference di F-PHAB e calcolo i rispettivi embeddings
+        total_annotations, total_labels, folds_1_1, folds_base, folds_subject = load_fphab_data()
+        action_sequences, action_sequences_augmented = load_actions_sequences_data_gen(total_annotations, num_augmentations, model_params)
+        embs, embs_aug = get_tcn_embeddings(model, action_sequences, action_sequences_augmented)
+
+        if num_augmentations > 0 and embs_aug is not None:
+            combined_embs = np.concatenate(embs_aug, axis=0)
+            combined_labels = np.concatenate([total_labels for _ in range(num_augmentations)], axis=0)
+        else:
+            combined_embs = embs
+            combined_labels = total_labels
+
+        print('Len single_action_embs:{}', len(single_action_embs))
+        print('Len label:{}', len(single_action_labels))
+
+        # Valuto la singola azione
+        acc, preds, true_labels = evaluate_single_action(single_action_embs, single_action_labels, combined_embs, combined_labels)
+        print(f"Accuratezza: {acc}")
+        #pred_action_name = get_action_name(a_mapping_fphab, int(preds[0]))
+        #true_action_name = get_action_name(a_mapping_fphab, int(true_labels[0]))
+        #print(f"Predizione: {pred_action_name}, Etichetta corretta: {true_action_name}")
+        print(f"Predizione: {preds}, Etichetta corretta: {true_labels}")
+
     # F-PHAB
     if args.eval_fphab:
         t = time.time()

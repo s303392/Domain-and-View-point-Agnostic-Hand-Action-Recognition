@@ -58,62 +58,23 @@ class DataGenerator():
         self.use_rotations = use_rotations
         self.rotation_noise = rotation_noise
         
-        
-
-        # # TODO: define normalization kps
-        # if joints_format == 'mpii':
-        #     self.wrist_kp, self.middle_base_kp = 0, 9
-        #     self.thumb_base_kp, self.index_base_kp, self.ring_base_kp = 1, 5, 13
-        #     self.joints_num = 21
-        #     connecting_joint = [1, # wrist
-        #                         0, 1, 2, 3, # 2 thumb
-        #                         0, 5, 6, 7, # 6 index
-        #                         0, 9, 10, 11,  # 10 middle
-        #                         0, 13, 14, 15,  # 14 ring
-        #                         0, 17, 18, 19   # 18pinky
-        #                         ]
-        # elif joints_format == 'frankmocap':
-        #     self.wrist_kp, self.middle_base_kp = 0, 4
-        #     self.thumb_base_kp, self.index_base_kp, self.ring_base_kp = 13, 1, 10
-        #     # 0         1   2       3   4       5   6       7   8       9   10      11  12      13  14      15  16
-        #     # [Wrist, TMCP, IMCP, MMCP, RMCP, PMCP, TPIP, TDIP, TTIP, IPIP, IDIP, ITIP, MPIP, MDIP, MTIP, RPIP, RDIP, RTIP, PPIP, PDIP, PTIP]
-        #     self.joints_num = 21
-        #     connecting_joint = [
-        #                         0,      # wrist
-        #                         0,1,2,
-        #                         0,4,5,
-        #                         0,7,8,
-        #                         0,10,11,
-        #                         0,13,14,
-        #                         3,6,9,12,15
-        #                         ]
-        # elif joints_format == 'hands17':
-        #     self.wrist_kp, self.middle_base_kp = 0, 3
-        #     self.thumb_base_kp, self.index_base_kp, self.ring_base_kp = 1, 2, 4
-        #     # 0         1   2       3   4       5   6       7   8       9   10      11  12      13  14      15  16
-        #     # [Wrist, TMCP, IMCP, MMCP, RMCP, PMCP, TPIP, TDIP, TTIP, IPIP, IDIP, ITIP, MPIP, MDIP, MTIP, RPIP, RDIP, RTIP, PPIP, PDIP, PTIP]
-        #     self.joints_num = 21
-        #     connecting_joint = [
-        #                         0,      # wrist
-        #                         0,0,0,0,0,  # 1-5 Finger base to wrist
-        #                         1,6,7,      # 6-8 thumb
-        #                         2,9,10,     # 9-11 index
-        #                         3, 12,13,
-        #                         4, 15,16,
-        #                         5, 18,19,
-        #                         ]
         if joints_format == 'common':
+#  F-PHAB (21 giunti)         
+#   0   |  1  |  2  |  3  |  4  |  5  |  6  |  7  |  8  |  9  |  10 |  11 |  12 |  13 |  14 |  15 |  16 |  17 |  18 |  19 |  20 |
+# [Wrist, TMCP, IMCP, MMCP, RMCP, PMCP, TPIP, TDIP, TTIP, IPIP, IDIP, ITIP, MPIP, MDIP, MTIP, RPIP, RDIP, RTIP, PPIP, PDIP, PTIP]
+
+# common_pose (20 giunti)
+#   0   |  1  |  2  |  3  |  4  |  5  |  6  |  7  |  8  |  9  |  10 |  11 | 12 | 13 | 14  |  15 |  16 |  17 |  18 |  19 |
+# [Wrist,TPIP, TDIP, TTIP, IMCP, IPIP, IDIP, ITIP, MMCP, MPIP, MDIP, MTIP, RMCP,RPIP, RDIP, RTIP, PMCP, PPIP, PDIP, PTIP]
             self.wrist_kp, self.middle_base_kp = 0, 8
             self.thumb_base_kp, self.index_base_kp, self.ring_base_kp = 1, 4, 12
-            # 0         1   2       3   4       5   6       7   8       9   10      11  12      13  14      15  16
-            # [Wrist, TMCP, IMCP, MMCP, RMCP, PMCP, TPIP, TDIP, TTIP, IPIP, IDIP, ITIP, MPIP, MDIP, MTIP, RPIP, RDIP, RTIP, PPIP, PDIP, PTIP]
             self.joints_num = 20
             connecting_joint = [1, # wrist
-                                0, 1, 2, # 2 thumb
-                                0, 4,5,6, # 6 index
-                                0, 8,9,10,  # 10 middle
-                                0, 12,13,14,  # 14 ring
-                                0, 16,17,18   # 18pinky
+                                0, 1, 2, # thumb
+                                0, 4, 5, 6, # index
+                                0, 8, 9, 10, # middle
+                                0, 12, 13, 14, # ring
+                                0, 16, 17, 18 # pinky
                                 ]
         elif joints_format == 'common_minimal':
             self.min_common_joints = [0, 8,     # Wrist, middle_base
@@ -121,18 +82,12 @@ class DataGenerator():
                                       ]
             self.joints_num = 7
             connecting_joint = [2,0,     # wrist
-                                 1,1,1,1,1
-                                 ]
+                                 1,1,1,1,1]
             self.wrist_kp, self.middle_base_kp = 0, 1
-                
-        else: raise ValueError('joints_format {} not handeled'.format(joints_format))
         
         self.joints_format = joints_format
         print(' * Using joints format:', joints_format)
         
-      
-        
-
         self.max_seq_len = max_seq_len
         # self.joints_num = joints_num
         self.joints_dim = 3
@@ -271,8 +226,13 @@ class DataGenerator():
     # Input sequence -> (num_frame, num_joints, joints_dim)
     def get_pose_data_v2(self, body, validation, rotation_matrix=None):
     
+        # Stampa i dati originali
+        #print("Original body data:", body)
+        #print("Original body shape:", body.shape)
+
         # 1. Remove frames without predictions
-        body = body[np.all(~np.all(body==0, axis=2), axis=1)]
+        #body = body[np.all(~np.all(body==0, axis=2), axis=1)]
+        #print("Body shape after removing frames without predictions:", body.shape)
         #body è un array di elementi che rappresentano un frame che contiene coordinate 3D 
         # delle articolazioni della mano [num_frames, joints_num, joints_dim]        
 
@@ -281,8 +241,7 @@ class DataGenerator():
 #   Skip frames, temporal scaling, sequence cropping, 
 #   scale by torso, random noise, sequence rotation
 # =============================================================================
-
-        # Slect skipping frames
+        # Slect skipping frames (viene messo a 3 nei modelli pre-trainati)
         if len(self.skip_frames) > 0:
             sk = np.random.choice(self.skip_frames)
         else: sk = 1
@@ -290,6 +249,9 @@ class DataGenerator():
         
         # 2. Reduce or extend the movement by interpolation. 
         # Ensures that the final movement will have at least 2 frames after skipping
+# Aiuta a gestire la lunghezza delle sequenze. 
+# In scenari pratici, le azioni possono avere durate diverse; 
+# questa tecnica garantisce che il modello impari solo dalle parti rilevanti della sequenza.
         if not validation and self.temporal_scale is not False:
             orig_new_frames = len(body)
             temporal_scale = list(self.temporal_scale)
@@ -305,6 +267,9 @@ class DataGenerator():
 
         # 3. Reduce frame rate
         # Ensures that the final movement will have at least 2 frames after skipping
+# Riduce la quantità di dati ridondanti, 
+# velocizzando l'addestramento e migliorando l'efficienza del modello. 
+# Inoltre, rende il modello più robusto nel caso di sequenze video con framerate variabili.
         if len(self.skip_frames) > 0:
             # sk = np.random.choice(self.skip_frames)
             if validation: sk_init = 0
@@ -313,28 +278,28 @@ class DataGenerator():
 
 
         # 4. Modify movement speed
+# Consente di simulare sequenze con durate e velocità diverse, 
+# rendendo il modello meno sensibile alla velocità del movimento. 
+# Questo è utile per riconoscere azioni che possono essere eseguite a ritmi diversi.
         if self.max_seq_len > 0:
-            # If movement is longer than max_seq_lenght -> crop to max_seq_length
             body = self.zoom_to_max_len(body)
         elif self.max_seq_len < 0:
             if not validation:
-                # Crop randomly the movement to -max_seq_length
                 start = np.random.randint(max(len(body)-abs(self.max_seq_len)+1, 1))
                 end = start + abs(self.max_seq_len)
                 body = body[start:end]
             else:
-                # Crop to the last part of the movement
                 start = max(0, (len(body) - abs(self.max_seq_len)) // 2)
                 end = start + abs(self.max_seq_len)
                 body = body[start:end]
-        
-        
+        #print("Body shape after modifying movement speed:", body.shape)
 
         # 5. Scale by torso
         if self.scale_by_torso: body = self.scale_skel(body)        
         
-        
         # 6. Add random noise and scales again
+# Introduce variabilità nelle coordinate, simulando errori di acquisizione dei dati dai sensori. 
+# Questo rende il modello più resiliente a dati rumorosi o imprecisi.        
         if not validation and self.add_coord_noise:
             # print('Adding coord noise')
             if self.noise_type == 'uniform':
@@ -353,6 +318,8 @@ class DataGenerator():
             body = self.rotate_sequence(body, rotation_matrix)
             
         # Rotation noise
+# Permette al modello di gestire variazioni di punto di vista, 
+# che sono comuni in applicazioni reali (ad esempio, diverse angolazioni della telecamera).
         if not validation and self.rotation_noise is not None and \
             self.rotation_noise is not False and  self.rotation_noise>0:
             rotation_matrix = self.get_constrained_rotation_matrix(self.rotation_noise)
@@ -369,38 +336,54 @@ class DataGenerator():
 # =============================================================================
 
         num_frames = len(body)
+        #print("Number of frames:", num_frames)
         pose_features = []
         
         if self.use_relative_coordinates:
             rel_coordinates = self.get_relative_coordinates(body)
-            # rel_coordinates = body.copy()
-            pose_features.append(np.reshape(rel_coordinates, (num_frames,self.joints_num * self.joints_dim)))
+            #print("Relative coordinates shape:", rel_coordinates.shape)
+            pose_features.append(np.reshape(rel_coordinates, (num_frames, self.joints_num * self.joints_dim)))
 
         if self.use_jcd_features:
             jcd_features = self.get_jcd_features(body, num_frames)
+            #print("JCD features shape:", jcd_features.shape)
             pose_features.append(jcd_features)
             
         if self.use_coord_diff:
-            speed_features = body[1:] - body[:-1]
-            speed_features = np.reshape(speed_features, (num_frames-1, self.joints_num*self.joints_dim))
-            # Duplicate features from first frame
-            speed_features = np.concatenate([np.expand_dims(speed_features[0], axis=0), speed_features], axis=0)
-            pose_features.append(speed_features)        
+            if num_frames > 1:
+                speed_features = body[1:] - body[:-1]
+                #print("Speed features shape before reshape:", speed_features.shape)
+                speed_features = np.reshape(speed_features, (num_frames-1, self.joints_num*self.joints_dim))
+                #print("Speed features shape after reshape:", speed_features.shape)
+                speed_features = np.concatenate([np.expand_dims(speed_features[0], axis=0), speed_features], axis=0)
+                #print("Speed features shape after concatenate:", speed_features.shape)
+                pose_features.append(speed_features)
+            else:
+                speed_features = np.zeros((num_frames, self.joints_num*self.joints_dim))
+                #print("Speed features shape (zeros):", speed_features.shape)
+                pose_features.append(speed_features)        
         
         if self.use_bone_angles or self.use_bone_angles_diff:
             bone_angles = self.get_body_spherical_angles(body)
+            #print("Bone angles shape:", bone_angles.shape)
             if self.use_bone_angles_diff:
-                bone_angles_diff = bone_angles[1:] - bone_angles[:-1]
-                # bone_angles_diff = np.reshape(bone_angles_diff, (num_frames-1, self.joints_num*self.joints_dim))
-                # Duplicate features from first frame
-                bone_angles_diff = np.concatenate([np.expand_dims(bone_angles_diff[0], axis=0), bone_angles_diff], axis=0)
-                pose_features.append(bone_angles_diff)
+                if num_frames > 1:
+                    bone_angles_diff = bone_angles[1:] - bone_angles[:-1]
+                    #print("Bone angles diff shape before concatenate:", bone_angles_diff.shape)
+                    bone_angles_diff = np.concatenate([np.expand_dims(bone_angles_diff[0], axis=0), bone_angles_diff], axis=0)
+                    #print("Bone angles diff shape after concatenate:", bone_angles_diff.shape)
+                    pose_features.append(bone_angles_diff)
+                else:
+                    bone_angles_diff = np.zeros((num_frames, (len(self.connecting_joint)-1)*2))
+                    #print("Bone angles diff shape (zeros):", bone_angles_diff.shape)
+                    pose_features.append(bone_angles_diff)
             if self.use_bone_angles:
                 pose_features.append(bone_angles)        
             
 
         # Create features array -> (num_frames, num_features)
         pose_features = np.concatenate(pose_features, axis=1).astype('float32')
+        #print("Pose features shape:", pose_features.shape)
 
             
         
@@ -650,7 +633,3 @@ if __name__ == '__main__':
         # batch_X, batch_Y, batch_sample_weights = next(triplet_gen)
         # batch_X, batch_Y, batch_sample_weights, batch_rot = next(triplet_gen)
         batch_Y = batch_Y[0]
-    
-        
-        
-    

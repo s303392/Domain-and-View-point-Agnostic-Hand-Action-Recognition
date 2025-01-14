@@ -213,6 +213,13 @@ class EncoderTCN(Model):
     def get_embedding(self, x):
         emb = self.encoder(x)
         return emb
+    def summary(self):
+        for i, layer in enumerate(self.encoder_layers):
+            print(f"Summary of TCN layer {i}:")
+            if hasattr(layer, 'summary'):
+                layer.summary()
+            else:
+                print(f"Layer {i} ({layer.__class__.__name__}) does not have a summary method.")
 
         
         
@@ -225,14 +232,14 @@ if __name__ == '__main__':
     os.environ["CUDA_VISIBLE_DEVICES"] = ""
     
     
-    num_feats = 87
-    batch_size = 28
-    max_seq_len = 64
+    num_feats = 54
+    batch_size = 64
+    max_seq_len = 32
     
     # conv_params = (256, 6, 2, True, 'causal', [2])             # 24
     # conv_params = (256, 6, 2, True, 'causal', [2])             # 24
     # conv_params = (256, 8, 2, True, 'causal', [4])
-    conv_params = (256, 8, 2, True, 'causal', [4])
+    conv_params = (256, 4, 2, True, 'causal', [4])
     dropout = 0.0
     masking = True
     prediction_mode=False
@@ -249,18 +256,25 @@ if __name__ == '__main__':
                  # att_layers = [256, -1]
                   # att_layers = [128, -1]
                     # att_layers = [-1]
-                    # att_layers = ['conv64', -1]
-                    att_layers = ['conv64', 'BatchNorm',  -1],
+                    att_layers = ['conv64', -1],
+                    #att_layers = ['conv64', 'BatchNorm',  -1],
                     # att_layers = [],
-                 # representation_layers = []
+                 representation_layers = []
                  # representation_layers = ['conv256']
-                  representation_layers = ['conv67']
+                  #representation_layers = ['conv67']
                  )    
 
 
     model.build((None, max_seq_len, num_feats))
+    model.encoder_net.summary()  # Stampa il summary di encoder_tcn
 
-
+    # Stampa il summary di ogni livello TCN
+    for i, layer in enumerate(model.encoder_net.encoder_layers):
+        print(f"Summary of TCN layer {i}:")
+        if hasattr(layer, 'summary'):
+            layer.summary()
+        else:
+            print(f"Layer {i} ({layer.__class__.__name__}) does not have a summary method.")
 
     mw32, pred32 = model(np.random.rand(batch_size,max_seq_len,num_feats), return_att_weights=True)
     pred32 = pred32.numpy()
