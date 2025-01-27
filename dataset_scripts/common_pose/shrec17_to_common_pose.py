@@ -17,12 +17,10 @@ if joints_num == 20:
 
 common_pose_joint_inds = [ shrec_joints[s] for s in common_pose_joints ]
 
-
-# %%
-
-common_pose_dataset_path = '/home/asabater/datasets/common_pose/'
-common_pose_dataset_path_dest = './datasets/common_pose/'
-base_dataset = '/home/asabater/datasets/HandGestureDataset_SHREC2017/'
+# Percorsi dei dataset
+common_pose_dataset_path = 'C:/Users/filip/Desktop/Politecnico/INGEGNERIA/TESI_loc/Sabater/Domain-and-View-point-Agnostic-Hand-Action-Recognition/datasets/common_pose/'
+common_pose_dataset_path_dest = 'C:/Users/filip/Desktop/Politecnico/INGEGNERIA/TESI_loc/Sabater/Domain-and-View-point-Agnostic-Hand-Action-Recognition/datasets/common_pose/'
+base_dataset = 'C:/Users/filip/Desktop/Politecnico/INGEGNERIA/TESI_loc/Sabater/Domain-and-View-point-Agnostic-Hand-Action-Recognition/datasets/SHREC2017/'
 
 # =============================================================================
 # Translate and store skeleton coordinates
@@ -33,9 +31,8 @@ for split_mode in ['train', 'val']:
     with open(path_split, 'r') as f: anns = f.read().splitlines()
     anns = [ list(map(int, l.split())) for l in anns ]
     
-    
-    store_14 = open('./annotations/SHREC2017/' + 'annotations_{}_{}_jn{}.txt'.format(split_mode, '14', joints_num), 'w')
-    store_28 = open('./annotations/SHREC2017/' + 'annotations_{}_{}_jn{}.txt'.format(split_mode, '28', joints_num), 'w')
+    store_14 = open('dataset_scripts/common_pose/annotations/SHREC2017/' + 'annotations_{}_{}_jn{}.txt'.format(split_mode, '14', joints_num), 'w')
+    store_28 = open('dataset_scripts/common_pose/annotations/SHREC2017/' + 'annotations_{}_{}_jn{}.txt'.format(split_mode, '28', joints_num), 'w')
 
     for ann in anns:
         id_gesture, id_finger, id_subject, id_essai, label_14, label_28, size_sequence = ann
@@ -47,6 +44,10 @@ for split_mode in ['train', 'val']:
     
         new_skel_path = os.path.join(common_pose_dataset_path, 'SHREC2017', 'gesture{}_finger{}_subject{}_essai{}_{}_jn{}.txt'.format(id_gesture, id_finger, id_subject, id_essai, split_mode, joints_num))
         new_skel_path_dest = os.path.join(common_pose_dataset_path_dest, 'SHREC2017', 'gesture{}_finger{}_subject{}_essai{}_{}_jn{}.txt'.format(id_gesture, id_finger, id_subject, id_essai, split_mode, joints_num))
+        
+        # Crea le directory necessarie
+        os.makedirs(os.path.dirname(new_skel_path), exist_ok=True)
+        
         joints_new = joints[:, common_pose_joint_inds]
         
         with open(new_skel_path, 'w') as f:
@@ -55,11 +56,25 @@ for split_mode in ['train', 'val']:
                 f.write(frame_joints + '\n')
             
         store_14.write(new_skel_path_dest + ' ' + str(label_14) + '\n')
-        store_28.write(new_skel_path_dest + ' ' + str(label_28) + '\n')        
-         
+        store_28.write(new_skel_path_dest + ' ' + str(label_28) + '\n')
 
+    store_14.close()
+    store_28.close()
 
+# Combina i file di annotazioni train e val in un unico file totale
+total_annotations_file_14 = 'dataset_scripts/SHREC2017/total_annotations_14_jn{}.txt'.format(joints_num)
+total_annotations_file_28 = 'dataset_scripts/SHREC2017/total_annotations_28_jn{}.txt'.format(joints_num)
 
+with open(total_annotations_file_14, 'w') as outfile:
+    for split_mode in ['train', 'val']:
+        annotations_file = 'dataset_scripts/common_pose/annotations/SHREC2017/annotations_{}_14_jn{}.txt'.format(split_mode, joints_num)
+        with open(annotations_file, 'r') as infile:
+            for line in infile:
+                outfile.write(line)
 
-
-
+with open(total_annotations_file_28, 'w') as outfile:
+    for split_mode in ['train', 'val']:
+        annotations_file = 'dataset_scripts/common_pose/annotations/SHREC2017/annotations_{}_28_jn{}.txt'.format(split_mode, joints_num)
+        with open(annotations_file, 'r') as infile:
+            for line in infile:
+                outfile.write(line)

@@ -45,6 +45,29 @@ def load_annotations(annotation_file):
 
 annotations = load_annotations(ANNOTATION_FILE)
 
+def create_action_mapping(file_path):
+    action_mapping = {}
+    with open(file_path, 'r') as f:
+        lines = f.readlines()
+        for line in lines:
+            if line.startswith('Training') or line.startswith('Test'):
+                continue
+            parts = line.strip().split()
+            if '/' in parts[0]:
+                action_name = parts[0].split('/')[1]  # Prendi solo il nome dell'azione
+            else:
+                action_name = parts[0]  # Prendi la parola prima dello spazio
+            action_number = int(parts[-1])
+            if action_number not in action_mapping:
+                action_mapping[action_number] = action_name
+    return action_mapping
+
+def get_action_name(action_mapping, action_number):
+    return action_mapping.get(action_number, "Unknown")
+
+file_path = './datasets/SHREC2017/data_action_recognition.txt'
+a_mapping_fphab = create_action_mapping(file_path)
+
 # Inizializza il DataGenerator
 data_gen = DataGenerator(**model_params['backbone_params'])
 
@@ -79,7 +102,7 @@ def evaluate_model(model, sequences, labels):
     if isinstance(probabilities, list):
         print(f'Length of probabilities list: {len(probabilities)}')
         for i, prob in enumerate(probabilities):
-            print(f'Shape of probabilities[{i}]: {np.array(prob).shape}')
+            print(f'Shape of probabilities [{i}]: {np.array(prob).shape}')
     
     # Converti la lista in un array numpy se necessario
     if isinstance(probabilities, list):
@@ -88,25 +111,27 @@ def evaluate_model(model, sequences, labels):
     # Rimuovi la dimensione extra se necessario
     probabilities = np.squeeze(probabilities)
     
-    # Verifica la forma delle probabilità
-    print(f'Shape of probabilities: {probabilities.shape}')
-    
     # Assicurati che le probabilità abbiano la forma corretta
     if probabilities.shape[0] != len(sequences):
         raise ValueError(f'Expected probabilities to have shape ({len(sequences)}, ...), but got {probabilities.shape}')
     
     predictions = np.argmax(probabilities, axis=1)
     
+    # # Stampa un campione delle etichette predette
+    # print(f'Sample of predictions before offset: {predictions[:10]}')
+    
+    # Aggiungi un offset di 1 alle etichette predette (sono mappate da 0 a 27 e non da 1 a 28 come le true label)
+    predictions = predictions + 1
+    
+    # # Stampa un campione delle etichette predette dopo l'offset
+    # print(f'Sample of predictions after offset: {predictions[:10]}')
+    
     # Verifica la lunghezza e la forma delle previsioni e delle etichette
-    print(f'Number of sequences: {len(sequences)}')
-    print(f'Number of labels: {len(labels)}')
-    print(f'Number of predictions: {len(predictions)}')
     print(f'Shape of sequences: {sequences.shape}')
     print(f'Shape of labels: {labels.shape}')
     print(f'Shape of predictions: {predictions.shape}')
     
     accuracy = accuracy_score(labels, predictions)
-    #print(f'Accuracy: {accuracy:.2f}')
     return predictions, accuracy, probabilities
 
 predictions, accuracy, probabilities = evaluate_model(model, sequences, labels)
@@ -118,7 +143,11 @@ print(f'Accuracy: {accuracy:.2f}')
 # Salva i risultati nel file di output
 with open(OUTPUT_RESULTS, "w") as f:
     for i, (pred, true_label) in enumerate(zip(predictions, labels)):
-        f.write(f"Sample {i}: True Label: {true_label}, Predicted: {pred}, Probabilities: {probabilities[i]}\n")
+        pred_action_name = get_action_name(a_mapping_fphab, int(pred))
+        true_action_name = get_action_name(a_mapping_fphab, int(true_label))
+        #print(f"Predizione: {pred_action_name}, Etichetta corretta: {true_action_name}")
+        #f.write(f"Sample {i}: True Label: {true_action_name}, Predicted: {pred_action_name} \n ")
+        f.write(f"Sample {i}: True Label: {true_label}, Predicted: {pred} \n ")
     f.write(f"\nOverall Accuracy: {accuracy * 100:.2f}%\n")
 
 if __name__ == "__main__":
