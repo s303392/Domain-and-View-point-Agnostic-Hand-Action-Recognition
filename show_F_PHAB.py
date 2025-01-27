@@ -18,7 +18,7 @@ joint_names = [
 
 # Load the data from the TXT file
 data = []
-with open('datasets/F-PHAB/Hand_pose_annotation_v1/Subject_1/charge_cell_phone/1/skeleton.txt', 'r') as f:
+with open('datasets/F-PHAB/Hand_pose_annotation_v1/Subject_1/close_juice_bottle/1/skeleton.txt', 'r') as f:
     for line in f:
         values = list(map(float, line.strip().split()))
         data.append(values)

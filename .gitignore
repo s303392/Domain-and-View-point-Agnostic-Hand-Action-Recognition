@@ -130,5 +130,7 @@ dmypy.json
 
 # Added to ignore dataset and pretrained models
 datasets/F-PHAB/
-datasets/myDataset/
+datasets/myDataset/MANUS_data
+datasets/myDataset/raw_MANUS_data
+datasets/mySHREC-17/raw_data
 pretrained_models/

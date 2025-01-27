@@ -8,15 +8,25 @@ import sys  # Import sys to access command-line arguments
 
 try:
     df = pd.read_csv(
-        'datasets/myDataset/MANUS_data/grab-dx-sx_IMU_2024-12-18_12-23-48_federico_R.csv',
+        'datasets/mySHREC-17/raw_data/9_rotation_ccw/rot_ccw02_LucaTracker_L.csv',
+        #'datasets/mySHREC-17/raw_data/15_swipe_left/SL_01_tracker_blenderCorSys_2025-01-23_17-30-43_LucaTracker_L.csv',
+        #'hand_global_positions.csv',
         sep=';',
-        decimal=',', 
-        encoding='utf-8',
-        error_bad_lines=False  
+        decimal=','
     )
     print("File letto con successo")
 except pd.errors.ParserError as e:
     print(f"Errore durante la lettura del file CSV: {e}")
+
+# Remove the first 3 columns
+df = df.iloc[:, 3:]
+
+# Separate position and rotation columns
+position_columns = [col for col in df.columns if '.1' not in col and '_W' not in col]
+rotation_columns = [col for col in df.columns if '.1' in col or '_W' in col]
+
+# Ask the user if they want to use rotations
+use_rotations = input("Vuoi utilizzare anche le rotazioni dei giunti? (s/n): ").lower() == 's'
 
 expected_columns = len(df.columns)
 for i, row in df.iterrows():
@@ -76,6 +86,53 @@ def get_joint_positions(frame_data):
 
     return joint_positions
 
+# Function to apply rotations to joint positions
+def apply_rotations(joint_positions, frame_data, frame_number):
+    for joint in joints:
+        if joint == 'Hand':
+            continue  # Skip the hand itself
+        x_col = f'{joint}_X.1'
+        y_col = f'{joint}_Y.1'
+        z_col = f'{joint}_Z.1'
+        w_col = f'{joint}_W'
+        if x_col in frame_data and y_col in frame_data and z_col in frame_data and w_col in frame_data:
+            # Get joint rotation
+            rotation = np.array([
+                frame_data[x_col],
+                frame_data[y_col],
+                frame_data[z_col],
+                frame_data[w_col]
+            ])
+            # Apply rotation to the joint position
+            original_position = joint_positions[joint]
+            rotated_position = rotate_position(original_position, rotation)
+            joint_positions[joint] = rotated_position
+
+            # Debug: Print original and rotated positions for every 10th frame
+            if frame_number == 10:
+                print(f"Frame: {frame_number}, Joint: {joint}")
+                print(f"Original Position: {original_position}")
+                print(f"Rotation: {rotation}")
+                print(f"Rotated Position: {rotated_position}")
+        else:
+            print(f"Warning: Missing rotation data for joint {joint}")
+
+    return joint_positions
+
+# Function to rotate a position using a quaternion ->
+#utilizzo la formula del quaternione
+def rotate_position(position, quaternion):
+    # Normalize the quaternion
+    quaternion = quaternion / np.linalg.norm(quaternion)
+    x, y, z, w = quaternion
+    # Quaternion rotation formula
+    rotated_position = np.array([
+        (1 - 2*y**2 - 2*z**2) * position[0] + (2*x*y - 2*z*w) * position[1] + (2*x*z + 2*y*w) * position[2],
+        (2*x*y + 2*z*w) * position[0] + (1 - 2*x**2 - 2*z**2) * position[1] + (2*y*z - 2*x*w) * position[2],
+        (2*x*z - 2*y*w) * position[0] + (2*y*z + 2*x*w) * position[1] + (1 - 2*x**2 - 2*y**2) * position[2]
+    ])
+    return rotated_position
+
 # Define the connections between joints to form the skeleton
 connections = [
     # Thumb
@@ -109,6 +166,9 @@ def update(frame_number):
     ax.clear()
     frame_data = df.iloc[frame_number]
     joint_positions = get_joint_positions(frame_data)
+    
+    if use_rotations:
+        joint_positions = apply_rotations(joint_positions, frame_data, frame_number)
 
     # Plot each joint
     for joint, pos in joint_positions.items():
@@ -152,7 +212,7 @@ def update(frame_number):
     ax.set_zlim([min(z_vals) - 0.1, max(z_vals) + 0.1])
 
     # Invert the X axis
-    ax.invert_xaxis()
+    #ax.invert_xaxis()
 
     # Set labels and title
     ax.set_xlabel('X')

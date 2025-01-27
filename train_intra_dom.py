@@ -41,7 +41,7 @@ def main(model_params, override_backbone_params):
     # Initialize inputs and outputs
     dummy_inpt = np.random.rand(backbone_params['batch_size'], abs(backbone_params['max_seq_len']), backbone_params['num_feats'])
     print(' * dummy_shape:', dummy_inpt.shape)
-    dummy_pred = clf_model(dummy_inpt);
+    dummy_pred = clf_model(dummy_inpt)
     print(' * dummy_pred shape', [ p.shape for p in dummy_pred ])
     
     clf_model.save(model_params['path_model'] + 'model')
