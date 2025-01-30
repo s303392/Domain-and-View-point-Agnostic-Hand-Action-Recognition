@@ -157,22 +157,26 @@ def load_actions_sequences_data_gen(total_annotations, num_augmentations, model_
     data_gen = DataGenerator(**model_params)
     if return_sequences: data_gen.max_seq_len = 0
     
-    if load_from_files: skels_ann = [ data_gen.load_skel_coords(ann) for ann in total_annotations ]
-    else: skels_ann = total_annotations
+    if load_from_files: 
+        skels_ann = [ data_gen.load_skel_coords(ann) for ann in total_annotations ]
+    else: 
+        skels_ann = total_annotations
 
     def get_pose_features(validation=False):
         action_sequences = [ data_gen.get_pose_data_v2(skels, validation=validation) for skels in skels_ann ]
-        if not return_sequences: action_sequences = pad_sequences(action_sequences, abs(model_params['max_seq_len']), dtype='float32', padding='pre')
+        if not return_sequences: 
+            action_sequences = pad_sequences(action_sequences, abs(model_params['max_seq_len']), dtype='float32', padding='pre')
         return action_sequences
     
     action_sequences = get_pose_features(validation=True)
     print('* Data sequences loaded')
     
+    action_sequences_augmented = None
     if num_augmentations > 0:
-        #
         action_sequences_augmented = Parallel(n_jobs=8)(delayed(get_pose_features)(validation=False) for i in tqdm(range(num_augmentations)))
         print('* Data sequences augmented')
-    else: action_sequences_augmented = None
+    else:
+        print('* No augmentations applied')
     
     return action_sequences, action_sequences_augmented
 
@@ -277,7 +281,10 @@ def create_action_mapping(file_path):
             if line.startswith('Training') or line.startswith('Test'):
                 continue
             parts = line.strip().split()
-            action_name = parts[0].split('/')[1]  # Prendi solo il nome dell'azione
+            if '/' in parts[0]:
+                action_name = parts[0].split('/')[1]  # Prendi solo il nome dell'azione
+            else:
+                action_name = parts[0]  # Prendi la parola prima dello spazio
             action_number = int(parts[-1])
             if action_number not in action_mapping:
                 action_mapping[action_number] = action_name
@@ -346,6 +353,81 @@ def evaluate_single_action(single_embs, single_labels, reference_embs, reference
     acc = accuracy_score(single_labels, preds)
     return acc, preds, single_labels
 
+# my Dataset
+
+def load_annotations(annotation_file):
+    with open(annotation_file, 'r') as f:
+        lines = f.readlines()
+    annotations = [line.strip().split()[0] for line in lines]
+    labels = np.array([int(line.strip().split()[1]) for line in lines])
+    return annotations, labels
+
+def get_embeddings_dataset(model, annotations, model_params):
+    action_sequences, action_sequences_augmented = load_actions_sequences_data_gen(annotations, num_augmentations, model_params)
+    embs, embs_aug = get_tcn_embeddings(model, action_sequences, action_sequences_augmented)
+    return embs, embs_aug
+
+def evaluate_my_actions(model, model_params, my_actions_file, reference_actions_file, action_mapping):
+    # Carica i dati di riferimento
+    reference_annotations, reference_labels = load_annotations(reference_actions_file)
+    reference_embs, ref_embs_aug = get_embeddings_dataset(model, reference_annotations, model_params)
+
+    # Carica le tue registrazioni
+    my_annotations, my_labels = load_annotations(my_actions_file)
+    my_embs, my_embs_aug = get_embeddings_dataset(model, my_annotations, model_params)
+
+    print(f"Lunghezza ref_embs: {len(reference_embs)}")
+    print(f"Lunghezza my_embs: {len(my_embs)}")
+    
+    if ref_embs_aug is not None:
+        print(f"Lunghezza ref_embs_aug: {len(ref_embs_aug)}")
+    if my_embs_aug is not None:
+        print(f"Lunghezza my_embs_aug: {len(my_embs_aug)}")
+
+    total_acc = 0
+    num_evaluations = 0
+
+    if my_embs_aug is not None:
+        combined_embs = np.concatenate(my_embs_aug, axis=0)
+        combined_labels = np.concatenate([my_labels for _ in range(len(my_embs_aug))], axis=0)
+        print(f"Lunghezza combined_embs: {len(combined_embs)}")
+        print(f"Lunghezza combined_labels: {len(combined_labels)}")
+
+        acc_combined, preds_combined, true_labels_combined = evaluate_single_action(combined_embs, combined_labels, reference_embs, reference_labels)
+        print(f"Accuratezza (combinata): {acc_combined}")
+        total_acc += acc_combined
+        num_evaluations += 1
+        for i in range(len(preds_combined)):
+            pred_action_name = get_action_name(action_mapping, int(preds_combined[i]))
+            true_action_name = get_action_name(action_mapping, int(true_labels_combined[i]))
+            print(f"Predizione (combinata): {pred_action_name}, Etichetta corretta: {true_action_name}")
+
+        for aug_idx, aug_embs in enumerate(my_embs_aug):
+            print(f"Valutazione delle sequenze augmentate {aug_idx + 1}")
+            acc_aug, preds_aug, true_labels_aug = evaluate_single_action(aug_embs, my_labels, reference_embs, reference_labels)
+            print(f"Accuratezza (augmentata {aug_idx + 1}): {acc_aug}")
+            total_acc += acc_aug
+            num_evaluations += 1
+            for i in range(len(preds_aug)):
+                pred_action_name = get_action_name(action_mapping, int(preds_aug[i]))
+                true_action_name = get_action_name(action_mapping, int(true_labels_aug[i]))
+                print(f"Predizione (augmentata {aug_idx + 1}): {pred_action_name}, Etichetta corretta: {true_action_name}")
+    else:
+        # Valuta le tue registrazioni utilizzando il KNN addestrato sui dati di riferimento
+        acc, preds, true_labels = evaluate_single_action(my_embs, my_labels, reference_embs, reference_labels)
+        print(f"Accuratezza: {acc}")
+        total_acc += acc
+        num_evaluations += 1
+        for i in range(len(preds)):
+            pred_action_name = get_action_name(action_mapping, int(preds[i]))
+            true_action_name = get_action_name(action_mapping, int(true_labels[i]))
+            print(f"Predizione: {pred_action_name}, Etichetta corretta: {true_action_name}")
+
+    # Calcola l'accuratezza totale combinata
+    if num_evaluations > 0:
+        total_acc /= num_evaluations
+        print(f"ACCURATEZZA totale combinata: {total_acc}")
+
 # %%
 
 # =============================================================================
@@ -372,6 +454,7 @@ def load_shrec_data():
     with open(os.path.join(base_path+shrec_val_anns), 'r') as f: shrec_val_anns = f.read().splitlines()
     total_shrec_labels_14 = np.stack([ l.split()[-1] for l in shrec_train_anns+shrec_val_anns ])
 
+    #indici, annotazioni e etichette
     shrec_folds_14 = {
         0:{'indexes': shrec_train_indexes, 'annotations': total_shrec_anns[shrec_train_indexes], 'labels': total_shrec_labels_14[shrec_train_indexes]},
         1:{'indexes': shrec_val_indexes, 'annotations': total_shrec_anns[shrec_val_indexes], 'labels': total_shrec_labels_14[shrec_val_indexes]},
@@ -384,6 +467,7 @@ def load_shrec_data():
     with open(os.path.join(base_path+shrec_val_anns), 'r') as f: shrec_val_anns = f.read().splitlines()
     total_shrec_labels_28 = np.stack([ l.split()[-1] for l in shrec_train_anns+shrec_val_anns ])
 
+    #indici, annotazioni e etichette
     shrec_folds_28 = {
         0:{'indexes': shrec_train_indexes, 'annotations': total_shrec_anns[shrec_train_indexes], 'labels': total_shrec_labels_28[shrec_train_indexes]},
         1:{'indexes': shrec_val_indexes, 'annotations': total_shrec_anns[shrec_val_indexes], 'labels': total_shrec_labels_28[shrec_val_indexes]},
@@ -463,6 +547,8 @@ if __name__ == '__main__':
     parser.add_argument('--eval_shrec', action='store_true', help='evaluate on SHREC splits')
     parser.add_argument('--eval_msra', action='store_true', help='evaluate on MSRA dataset')
     parser.add_argument('--single_action', type=str, help='path to the annotation file for a single action')
+    parser.add_argument('--my_actions', type=str, help='path to the annotation file for your actions')
+    parser.add_argument('--reference_actions', type=str, help='path to the annotation file for reference actions')
     args = parser.parse_args()
 
     model, model_params = prediction_utils.load_model(args.path_model, False, loss_name = args.loss_name)
@@ -475,14 +561,20 @@ if __name__ == '__main__':
 
     print_model_details(model_params)
     
-    file_path = 'C:/Users/filip/Desktop/Politecnico/INGEGNERIA/TESI_loc/Sabater/Domain-and-View-point-Agnostic-Hand-Action-Recognition/datasets/F-PHAB/data_split_action_recognition.txt'
-    a_mapping_fphab = create_action_mapping(file_path)
-    #print(a_mapping_fphab) #{num_action: name_action, ..}
-
     # %%
+    
+    # myDATASET
+    if args.my_actions and args.reference_actions:
+        action_mapping_file_path = 'C:/Users/filip/Desktop/Politecnico/INGEGNERIA/TESI_loc/Sabater/Domain-and-View-point-Agnostic-Hand-Action-Recognition/datasets/SHREC2017/data_action_recognition.txt'
+        action_mapping = create_action_mapping(action_mapping_file_path)
+
+        evaluate_my_actions(model, model_params, args.my_actions, args.reference_actions, action_mapping)
 
     # SINGLE MY ACTION
     if args.single_action:
+        file_path = ''
+        a_mapping = create_action_mapping(file_path)
+
         single_action_sequences, single_action_labels = load_single_action_data(args.single_action, model_params)
         single_action_embs = get_embeddings(model, single_action_sequences)
        
@@ -505,8 +597,8 @@ if __name__ == '__main__':
         # Valuto la singola azione
         acc, preds, true_labels = evaluate_single_action(single_action_embs, single_action_labels, combined_embs, combined_labels)
         print(f"Accuratezza: {acc}")
-        #pred_action_name = get_action_name(a_mapping_fphab, int(preds[0]))
-        #true_action_name = get_action_name(a_mapping_fphab, int(true_labels[0]))
+        #pred_action_name = get_action_name(a_mapping, int(preds[0]))
+        #true_action_name = get_action_name(a_mapping, int(true_labels[0]))
         #print(f"Predizione: {pred_action_name}, Etichetta corretta: {true_action_name}")
         print(f"Predizione: {preds}, Etichetta corretta: {true_labels}")
 
@@ -528,6 +620,10 @@ if __name__ == '__main__':
         print('Len embs_aug:{}', len(embs_aug))#10 (vettore con 10 embs augmentati)
         total_res_fphab, all_preds_fphab, all_true_fphab = evaluate_fphab(aug_loop, folds_base, folds_1_1, folds_subject, embs, embs_aug, total_labels, knn_neighbors)
         #print_results('F-PHAB   ', total_res_fphab, knn_neighbors, aug_loop)
+
+        file_path = 'C:/Users/filip/Desktop/Politecnico/INGEGNERIA/TESI_loc/Sabater/Domain-and-View-point-Agnostic-Hand-Action-Recognition/datasets/F-PHAB/data_split_action_recognition.txt'
+        a_mapping_fphab = create_action_mapping(file_path)
+        #print(a_mapping_fphab) #{num_action: name_action, ..}        
         
         # Stampa un esempio di predizione con il nome dell'azione e la sua etichetta corretta
         for n_aug in all_preds_fphab:
@@ -560,7 +656,7 @@ if __name__ == '__main__':
         
 
         del embs; del embs_aug; del action_sequences; del action_sequences_augmented
-    
+
     # %%
     # SHREC
     if args.eval_shrec:

@@ -1,0 +1,10 @@
+./datasets/common_pose/mySHREC-17/grab03_LucaTracker_L_combined_skeleton.txt 2
+./datasets/common_pose/mySHREC-17/grab04_LucaTracker_R_combined_skeleton.txt 2
+./datasets/common_pose/mySHREC-17/rot_cw03_LucaTracker_R_combined_skeleton.txt 8
+./datasets/common_pose/mySHREC-17/rot_cw04_LucaTracker_R_combined_skeleton.txt 8
+./datasets/common_pose/mySHREC-17/rot_ccw03_LucaTracker_L_combined_skeleton.txt 10
+./datasets/common_pose/mySHREC-17/rot_ccw04_LucaTracker_L_combined_skeleton.txt 10
+./datasets/common_pose/mySHREC-17/swipeRight03_LucaTracker_R_combined_skeleton.txt 14
+./datasets/common_pose/mySHREC-17/swipeRight04_LucaTracker_R_combined_skeleton.txt 14
+./datasets/common_pose/mySHREC-17/swipeLeft03_LucaTracker_L_combined_skeleton.txt 16
+./datasets/common_pose/mySHREC-17/swipeLeft04_LucaTracker_L_combined_skeleton.txt 16

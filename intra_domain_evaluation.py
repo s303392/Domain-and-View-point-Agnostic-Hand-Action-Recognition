@@ -146,8 +146,8 @@ with open(OUTPUT_RESULTS, "w") as f:
         pred_action_name = get_action_name(a_mapping_fphab, int(pred))
         true_action_name = get_action_name(a_mapping_fphab, int(true_label))
         #print(f"Predizione: {pred_action_name}, Etichetta corretta: {true_action_name}")
-        #f.write(f"Sample {i}: True Label: {true_action_name}, Predicted: {pred_action_name} \n ")
-        f.write(f"Sample {i}: True Label: {true_label}, Predicted: {pred} \n ")
+        f.write(f"Sample {i}: True Label: {true_action_name}, Predicted: {pred_action_name} \n ")
+        #f.write(f"Sample {i}: True Label: {true_label}, Predicted: {pred} \n ")
     f.write(f"\nOverall Accuracy: {accuracy * 100:.2f}%\n")
 
 if __name__ == "__main__":
