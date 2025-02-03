@@ -136,4 +136,5 @@ datasets/myDataset/raw_MANUS_data
 datasets/mySHREC-17/raw_data
 datasets/common_pose/SHREC2017
 datasets/common_pose/mySHREC-17
+datasets/common_pose/myDataset
 pretrained_models/

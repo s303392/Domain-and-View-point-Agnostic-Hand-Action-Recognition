@@ -4,8 +4,9 @@ import numpy as np
 import argparse
 
 # Define the input file path directly in the code
-input_file = 'datasets/common_pose/SHREC2017/gesture1_finger2_subject10_essai4_train_jn20.txt' #grab
-#input_file = 'datasets/common_pose/mySHREC-17/grab03_LucaTracker_L_combined_skeleton.txt'
+#input_file = 'datasets/common_pose/SHREC2017/gesture1_finger2_subject10_essai4_train_jn20.txt' #grab
+#input_file = 'datasets/common_pose/mySHREC-17/grab04_LucaTracker_R_combined_skeleton.txt'
+input_file = 'datasets/common_pose/myDataset/screw_dx_Luca037_31-01_LucaTracker_R_combined_skeleton.txt'
 #input_file = 'datasets/common_pose/SHREC2017/gesture11_finger2_subject14_essai1_train_jn20.txt' #11 label
 
 # Parse the animation flag

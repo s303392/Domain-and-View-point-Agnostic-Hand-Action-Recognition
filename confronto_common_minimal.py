@@ -105,9 +105,9 @@ def visualize_poses(file_path_1, file_path_2, animate=False):
     poses_1_rotated = rotate_sequence(poses_1_relative.copy())
     poses_2_rotated = rotate_sequence(poses_2_relative.copy())
     
-    # Save the poses to files
-    save_poses_to_file(poses_1_rotated, 'poses_1_rotated.txt')
-    save_poses_to_file(poses_2_rotated, 'poses_2_rotated.txt')
+    # # Save the poses to files
+    # save_poses_to_file(poses_1_rotated, 'poses_1_rotated.txt')
+    # save_poses_to_file(poses_2_rotated, 'poses_2_rotated.txt')
     
     # Compare poses
     compare_poses(poses_1_rotated, poses_2_rotated)
@@ -148,10 +148,12 @@ def visualize_poses(file_path_1, file_path_2, animate=False):
 f_phab = './datasets/common_pose/F-PHAB/Subject3_putsalt_1_val_jn20.txt'
 shrec = './datasets/common_pose/SHREC2017/gesture1_finger2_subject10_essai4_train_jn20.txt'
 myShrec = './datasets/common_pose/mySHREC-17/grab04_LucaTracker_R_combined_skeleton.txt'
+myDataset = './datasets/common_pose/myDataset/screw_dx_Luca030_31-01_LucaTracker_R_combined_skeleton.txt'
 
 # Chiedi all'utente se vuole visualizzare l'animazione
 animate = input("Vuoi visualizzare l'animazione? (s/n): ").strip().lower() == 's'
 
 #visualize_poses(f_phab, shrec, animate=animate)
 #visualize_poses(f_phab, myShrec, animate=animate)
-visualize_poses(myShrec, shrec, animate=animate)
+#visualize_poses(myShrec, shrec, animate=animate)
+visualize_poses(myDataset, shrec, animate=animate)

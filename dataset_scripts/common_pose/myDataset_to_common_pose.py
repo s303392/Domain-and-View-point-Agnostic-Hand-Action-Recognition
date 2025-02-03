@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import os
 import numpy as np
 import pandas as pd
@@ -32,19 +31,14 @@ parser.add_argument('--include_additional_features', action='store_true', help='
 parser.add_argument('--include_rotations', action='store_true', help='Includi le rotazioni dei giunti nei dati di output')
 parser.add_argument('--single_hand', action='store_true', help='Utilizza i dati di una sola mano')
 parser.add_argument('--create_folds', action='store_true', help='Crea i fold per la valutazione del modello')
-parser.add_argument('--cut_config', type=str, required=True, help='Path al file di configurazione dei tagli delle sequenze')
 args = parser.parse_args()
 
-# Carica il file di configurazione dei tagli
-with open(args.cut_config, 'r') as f:
-    cut_config = json.load(f)
-
 # Percorsi dei dataset
-output_dataset_path = './datasets/common_pose/myDataset/'
-os.makedirs(output_dataset_path, exist_ok=True)
+OUTPUT_DIR = './datasets/common_pose/myDataset'
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # File di annotazioni di input
-annotation_base_path = os.path.dirname(args.annotation_file)
+INPUT_DIR = os.path.dirname(args.annotation_file)
 with open(args.annotation_file, 'r') as annotation_file:
     lines = annotation_file.readlines()
 
@@ -53,7 +47,7 @@ annotations = []
 for line in lines:
     if args.single_hand:
         csv_rel_path, label = line.strip().split()
-        csv_path = os.path.join(annotation_base_path, csv_rel_path)
+        csv_path = os.path.join(INPUT_DIR, csv_rel_path)
         data = pd.read_csv(csv_path,
             sep=';',
             decimal=',', 
@@ -65,8 +59,8 @@ for line in lines:
         annotations.append((csv_path, label))
     else:
         left_csv_rel_path, right_csv_rel_path, label = line.strip().split()
-        left_csv_path = os.path.join(annotation_base_path, left_csv_rel_path)
-        right_csv_path = os.path.join(annotation_base_path, right_csv_rel_path)
+        left_csv_path = os.path.join(INPUT_DIR, left_csv_rel_path)
+        right_csv_path = os.path.join(INPUT_DIR, right_csv_rel_path)
         left_data = pd.read_csv(left_csv_path)
         right_data = pd.read_csv(right_csv_path)
         print(f"Caricati dati CSV: {left_csv_path} e {right_csv_path}")
@@ -115,25 +109,6 @@ for line in lines:
         if args.include_additional_features:
             print(f"Dimensioni combined_additional_features: {combined_additional_features.shape}")
 
-    # Taglia la sequenza in base ai valori di inizio e fine specificati nel file di configurazione
-    #TODO: deve prendere i nomi dal file e non direttamente un singolo nome
-    csv_filename = "MANUS_data/grab-dx-sx_2024-12-18_12-23-48_federico_R.csv" 
-    if csv_filename in cut_config:
-        start_frame = cut_config[csv_filename]["start_frame"]
-        end_frame = cut_config[csv_filename]["end_frame"]
-    else:
-        print(f"Errore: {csv_path} non trovato nel file di configurazione dei tagli.")
-        continue
-
-    if args.single_hand:
-        data_filtered = data_filtered.iloc[start_frame:end_frame]
-        if args.include_additional_features:
-            additional_features_data = additional_features_data.iloc[start_frame:end_frame]
-    else:
-        combined_joints_data = combined_joints_data.iloc[start_frame:end_frame]
-        if combined_additional_features is not None:
-            combined_additional_features = combined_additional_features.iloc[start_frame:end_frame]
-
     if args.single_hand:
         num_frames = len(data_filtered)
         num_columns = data_filtered.shape[1]
@@ -151,9 +126,10 @@ for line in lines:
         combined_joints_data_np = combined_joints_data.values.reshape((num_frames, original_joints_num * 2, num_features_per_joint))
         print(f"Dimensioni combined_joints_data_np: {combined_joints_data_np.shape}")
 
-    custom_name = 'single_0_action'
-    output_filename = f'{custom_name}_combined_skeleton.txt'
-    new_skel_path = os.path.join(output_dataset_path, output_filename)
+    # Estrai il nome del file di input senza l'estensione
+    input_filename = os.path.splitext(os.path.basename(csv_rel_path if args.single_hand else left_csv_rel_path))[0]
+    output_filename = f'{input_filename}_combined_skeleton.txt'
+    new_skel_path = os.path.join(OUTPUT_DIR, output_filename)
     os.makedirs(os.path.dirname(new_skel_path), exist_ok=True)
     with open(new_skel_path, 'w') as f:
         for i in range(num_frames):
@@ -174,9 +150,9 @@ for line in lines:
 
     print(f"Dati combinati salvati in: {new_skel_path}")
 
-    total_annotations_file = './dataset_scripts/myDataset/total_annotations.txt'
-    os.makedirs(os.path.dirname(total_annotations_file), exist_ok=True)
-    with open(total_annotations_file, 'a') as store:
+    OUTPUT_FILE = './dataset_scripts/myDataset/tot_annotations.txt'
+    os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
+    with open(OUTPUT_FILE, 'a') as store:
         store.write(f'{new_skel_path} {label}\n')
 
 print("Conversione completata e file di annotazioni generati con successo.")
@@ -196,7 +172,7 @@ def create_folds(annotations, labels, num_folds):
     return folds
 
 # Leggi le annotazioni combinate
-with open(total_annotations_file, 'r') as f:
+with open(OUTPUT_FILE, 'r') as f:
     total_annotations = f.readlines()
 
 total_labels = [ann.split()[-1] for ann in total_annotations]
@@ -219,13 +195,13 @@ else:
         print("Folds Subject:", len(folds_subject[0]['train']))  # 196 1175 // 6
 
         # Salva i fold in file .pckl
-        with open(os.path.join(output_dataset_path, 'annotations_table_2_cross-action_folds_1_1_jn25.pckl'), 'wb') as f:
+        with open(os.path.join(OUTPUT_DIR, 'annotations_table_2_cross-action_folds_1_1_jn25.pckl'), 'wb') as f:
             pickle.dump(folds_1_1, f)
 
-        with open(os.path.join(output_dataset_path, 'annotations_table_2_cross-action_folds_jn25.pckl'), 'wb') as f:
+        with open(os.path.join(OUTPUT_DIR, 'annotations_table_2_cross-action_folds_jn25.pckl'), 'wb') as f:
             pickle.dump(folds_base, f)
 
-        with open(os.path.join(output_dataset_path, 'annotations_table_2_cross-action_folds_subject_jn25.pckl'), 'wb') as f:
+        with open(os.path.join(OUTPUT_DIR, 'annotations_table_2_cross-action_folds_subject_jn25.pckl'), 'wb') as f:
             pickle.dump(folds_subject, f)
     else:
         print("Creazione dei fold disabilitata.")

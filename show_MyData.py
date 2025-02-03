@@ -8,8 +8,9 @@ import sys  # Import sys to access command-line arguments
 
 try:
     df = pd.read_csv(
-        'datasets/mySHREC-17/raw_data/9_rotation_ccw/rot_ccw02_LucaTracker_L.csv',
+        #'datasets/mySHREC-17/raw_data/9_rotation_ccw/rot_ccw02_LucaTracker_L.csv',
         #'datasets/mySHREC-17/raw_data/15_swipe_left/SL_01_tracker_blenderCorSys_2025-01-23_17-30-43_LucaTracker_L.csv',
+        'datasets/myDataset/MANUS_data/pickplace/dx/pickplace_dx_Luca040_30-01_LucaTracker_R.csv',
         #'hand_global_positions.csv',
         sep=';',
         decimal=','

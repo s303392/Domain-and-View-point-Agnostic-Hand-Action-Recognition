@@ -25,7 +25,8 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 knn_neighbors = [1,3,5,7,9,11]
 # aug_loop = [0,10,20,40]
 aug_loop = [0,40]
-num_augmentations = max(aug_loop) 
+num_augmentations = max(aug_loop)
+#num_augmentations = 0
 #num_augmentations: si riferisce al numero di versioni augmentate 
 # delle sequenze di azioni originali 
 weights = 'distance'
@@ -367,7 +368,7 @@ def get_embeddings_dataset(model, annotations, model_params):
     embs, embs_aug = get_tcn_embeddings(model, action_sequences, action_sequences_augmented)
     return embs, embs_aug
 
-def evaluate_my_actions(model, model_params, my_actions_file, reference_actions_file, action_mapping):
+def evaluate_my_actions(model, model_params, my_actions_file, reference_actions_file, action_mapping, output_file):
     # Carica i dati di riferimento
     reference_annotations, reference_labels = load_annotations(reference_actions_file)
     reference_embs, ref_embs_aug = get_embeddings_dataset(model, reference_annotations, model_params)
@@ -387,46 +388,36 @@ def evaluate_my_actions(model, model_params, my_actions_file, reference_actions_
     total_acc = 0
     num_evaluations = 0
 
-    if my_embs_aug is not None:
-        combined_embs = np.concatenate(my_embs_aug, axis=0)
-        combined_labels = np.concatenate([my_labels for _ in range(len(my_embs_aug))], axis=0)
-        print(f"Lunghezza combined_embs: {len(combined_embs)}")
-        print(f"Lunghezza combined_labels: {len(combined_labels)}")
-
-        acc_combined, preds_combined, true_labels_combined = evaluate_single_action(combined_embs, combined_labels, reference_embs, reference_labels)
-        print(f"Accuratezza (combinata): {acc_combined}")
-        total_acc += acc_combined
-        num_evaluations += 1
-        for i in range(len(preds_combined)):
-            pred_action_name = get_action_name(action_mapping, int(preds_combined[i]))
-            true_action_name = get_action_name(action_mapping, int(true_labels_combined[i]))
-            print(f"Predizione (combinata): {pred_action_name}, Etichetta corretta: {true_action_name}")
-
-        for aug_idx, aug_embs in enumerate(my_embs_aug):
-            print(f"Valutazione delle sequenze augmentate {aug_idx + 1}")
-            acc_aug, preds_aug, true_labels_aug = evaluate_single_action(aug_embs, my_labels, reference_embs, reference_labels)
-            print(f"Accuratezza (augmentata {aug_idx + 1}): {acc_aug}")
-            total_acc += acc_aug
+    with open(output_file, 'w') as f:
+        if my_embs_aug is not None:
+            for aug_idx, aug_embs in enumerate(my_embs_aug):
+                print(f"Valutazione delle sequenze augmentate {aug_idx + 1}")
+                acc_aug, preds_aug, true_labels_aug = evaluate_single_action(aug_embs, my_labels, reference_embs, reference_labels)
+                print(f"Accuratezza (augmentata {aug_idx + 1}): {acc_aug}")
+                total_acc += acc_aug
+                num_evaluations += 1
+                f.write(f"Accuratezza (augmentata {aug_idx + 1}): {acc_aug}\n")
+                for i in range(len(preds_aug)):
+                    pred_action_name = get_action_name(action_mapping, int(preds_aug[i]))
+                    true_action_name = get_action_name(action_mapping, int(true_labels_aug[i]))
+                    f.write(f"Predizione (augmentata {aug_idx + 1}): {pred_action_name}, Etichetta corretta: {true_action_name}\n")
+        else:
+            # Valuta le tue registrazioni utilizzando il KNN addestrato sui dati di riferimento
+            acc, preds, true_labels = evaluate_single_action(my_embs, my_labels, reference_embs, reference_labels)
+            print(f"Accuratezza: {acc}")
+            total_acc += acc
             num_evaluations += 1
-            for i in range(len(preds_aug)):
-                pred_action_name = get_action_name(action_mapping, int(preds_aug[i]))
-                true_action_name = get_action_name(action_mapping, int(true_labels_aug[i]))
-                print(f"Predizione (augmentata {aug_idx + 1}): {pred_action_name}, Etichetta corretta: {true_action_name}")
-    else:
-        # Valuta le tue registrazioni utilizzando il KNN addestrato sui dati di riferimento
-        acc, preds, true_labels = evaluate_single_action(my_embs, my_labels, reference_embs, reference_labels)
-        print(f"Accuratezza: {acc}")
-        total_acc += acc
-        num_evaluations += 1
-        for i in range(len(preds)):
-            pred_action_name = get_action_name(action_mapping, int(preds[i]))
-            true_action_name = get_action_name(action_mapping, int(true_labels[i]))
-            print(f"Predizione: {pred_action_name}, Etichetta corretta: {true_action_name}")
+            f.write(f"Accuratezza: {acc}\n")
+            for i in range(len(preds)):
+                pred_action_name = get_action_name(action_mapping, int(preds[i]))
+                true_action_name = get_action_name(action_mapping, int(true_labels[i]))
+                f.write(f"Predizione: {pred_action_name}, Etichetta corretta: {true_action_name}\n")
 
-    # Calcola l'accuratezza totale combinata
-    if num_evaluations > 0:
-        total_acc /= num_evaluations
-        print(f"ACCURATEZZA totale combinata: {total_acc}")
+        # Calcola l'accuratezza totale combinata
+        if num_evaluations > 0:
+            total_acc /= num_evaluations
+            print(f"ACCURATEZZA totale combinata: {total_acc}")
+            f.write(f"ACCURATEZZA totale combinata: {total_acc}\n")
 
 # %%
 
@@ -568,7 +559,8 @@ if __name__ == '__main__':
         action_mapping_file_path = 'C:/Users/filip/Desktop/Politecnico/INGEGNERIA/TESI_loc/Sabater/Domain-and-View-point-Agnostic-Hand-Action-Recognition/datasets/SHREC2017/data_action_recognition.txt'
         action_mapping = create_action_mapping(action_mapping_file_path)
 
-        evaluate_my_actions(model, model_params, args.my_actions, args.reference_actions, action_mapping)
+        OUTPUT_FILE = './myDatasetClassification_CD_result.txt'
+        evaluate_my_actions(model, model_params, args.my_actions, args.reference_actions, action_mapping, OUTPUT_FILE)
 
     # SINGLE MY ACTION
     if args.single_action:
