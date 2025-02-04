@@ -42,117 +42,121 @@ INPUT_DIR = os.path.dirname(args.annotation_file)
 with open(args.annotation_file, 'r') as annotation_file:
     lines = annotation_file.readlines()
 
-# Estrai e processa i dati da ogni file CSV di annotazioni
-annotations = []
-for line in lines:
-    if args.single_hand:
-        csv_rel_path, label = line.strip().split()
-        csv_path = os.path.join(INPUT_DIR, csv_rel_path)
-        data = pd.read_csv(csv_path,
-            sep=';',
-            decimal=',', 
-            encoding='utf-8',
-            error_bad_lines=False  
-            )
-        print(f"Caricati dati CSV: {csv_path}")
-        print(f"Dimensioni data: {data.shape}")
-        annotations.append((csv_path, label))
-    else:
-        left_csv_rel_path, right_csv_rel_path, label = line.strip().split()
-        left_csv_path = os.path.join(INPUT_DIR, left_csv_rel_path)
-        right_csv_path = os.path.join(INPUT_DIR, right_csv_rel_path)
-        left_data = pd.read_csv(left_csv_path)
-        right_data = pd.read_csv(right_csv_path)
-        print(f"Caricati dati CSV: {left_csv_path} e {right_csv_path}")
-        print(f"Dimensioni left_data: {left_data.shape}, Dimensioni right_data: {right_data.shape}")
-        annotations.append((left_csv_path, right_csv_path, label))
+# File di annotazioni di output
+OUTPUT_FILE = './dataset_scripts/myDataset/tot_annotations.txt'
+os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
 
-    # Filtra solo le colonne di interesse
-    base_features = ['_X', '_Y', '_Z']
-    rotation_features = ['rotation_X', 'rotation_Y', 'rotation_Z']
-    velocity_acceleration_features = ['velocity_X', 'velocity_Y', 'velocity_Z', 'acceleration_X', 'acceleration_Y', 'acceleration_Z']
-    additional_features = ['angle', 'angular_velocity', 'angular_acceleration', 'pinch_distance']
+# Apri il file di annotazioni in modalità di scrittura una volta
+with open(OUTPUT_FILE, 'w') as store:
+    # Estrai e processa i dati da ogni file CSV di annotazioni
+    annotations = []
+    for line in lines:
+        if args.single_hand:
+            csv_rel_path, label = line.strip().split()
+            csv_path = os.path.join(INPUT_DIR, csv_rel_path)
+            data = pd.read_csv(csv_path,
+                sep=';',
+                decimal=',', 
+                encoding='utf-8',
+                error_bad_lines=False  
+                )
+            print(f"Caricati dati CSV: {csv_path}")
+            print(f"Dimensioni data: {data.shape}")
+            annotations.append((csv_path, label))
+        else:
+            left_csv_rel_path, right_csv_rel_path, label = line.strip().split()
+            left_csv_path = os.path.join(INPUT_DIR, left_csv_rel_path)
+            right_csv_path = os.path.join(INPUT_DIR, right_csv_rel_path)
+            left_data = pd.read_csv(left_csv_path)
+            right_data = pd.read_csv(right_csv_path)
+            print(f"Caricati dati CSV: {left_csv_path} e {right_csv_path}")
+            print(f"Dimensioni left_data: {left_data.shape}, Dimensioni right_data: {right_data.shape}")
+            annotations.append((left_csv_path, right_csv_path, label))
 
-    feature_columns_per_joint = base_features
-    if args.include_rotations:
-        feature_columns_per_joint += rotation_features
-    if args.include_velocity_acceleration:
-        feature_columns_per_joint += velocity_acceleration_features
+        # Filtra solo le colonne di interesse
+        base_features = ['_X', '_Y', '_Z']
+        rotation_features = ['rotation_X', 'rotation_Y', 'rotation_Z']
+        velocity_acceleration_features = ['velocity_X', 'velocity_Y', 'velocity_Z', 'acceleration_X', 'acceleration_Y', 'acceleration_Z']
+        additional_features = ['angle', 'angular_velocity', 'angular_acceleration', 'pinch_distance']
 
-    if args.single_hand:
-        feature_columns = [col for col in data.columns if any(feature in col for feature in feature_columns_per_joint)]
-        additional_feature_columns = [col for col in data.columns if any(feature in col for feature in additional_features)] if args.include_additional_features else []
-        data_filtered = data[feature_columns]
-        additional_features_data = data[additional_feature_columns]
-        print(f"Dimensioni data_filtered: {data_filtered.shape}")
-        if args.include_additional_features:
-            print(f"Dimensioni additional_features_data: {additional_features_data.shape}")
-    else:
-        feature_columns = [col for col in left_data.columns if any(feature in col for feature in feature_columns_per_joint)]
-        additional_feature_columns = [col for col in left_data.columns if any(feature in col for feature in additional_features)] if args.include_additional_features else []
-        left_data_filtered = left_data[feature_columns]
-        right_data_filtered = right_data[feature_columns]
-        left_additional_features = left_data[additional_feature_columns]
-        right_additional_features = right_data[additional_feature_columns]
-        print(f"Dimensioni left_data_filtered: {left_data_filtered.shape}, Dimensioni right_data_filtered: {right_data_filtered.shape}")
-        if args.include_additional_features:
-            print(f"Dimensioni left_additional_features: {left_additional_features.shape}, Dimensioni right_additional_features: {right_additional_features.shape}")
+        feature_columns_per_joint = base_features
+        if args.include_rotations:
+            feature_columns_per_joint += rotation_features
+        if args.include_velocity_acceleration:
+            feature_columns_per_joint += velocity_acceleration_features
 
-        if len(left_data_filtered) != len(right_data_filtered):
-            raise ValueError("Il numero di frame nelle due mani non corrisponde. Controllare i file: {} e {}".format(left_csv_path, right_csv_path))
+        if args.single_hand:
+            feature_columns = [col for col in data.columns if any(feature in col for feature in feature_columns_per_joint)]
+            additional_feature_columns = [col for col in data.columns if any(feature in col for feature in additional_features)] if args.include_additional_features else []
+            data_filtered = data[feature_columns]
+            additional_features_data = data[additional_feature_columns]
+            print(f"Dimensioni data_filtered: {data_filtered.shape}")
+            if args.include_additional_features:
+                print(f"Dimensioni additional_features_data: {additional_features_data.shape}")
+        else:
+            feature_columns = [col for col in left_data.columns if any(feature in col for feature in feature_columns_per_joint)]
+            additional_feature_columns = [col for col in left_data.columns if any(feature in col for feature in additional_features)] if args.include_additional_features else []
+            left_data_filtered = left_data[feature_columns]
+            right_data_filtered = right_data[feature_columns]
+            left_additional_features = left_data[additional_feature_columns]
+            right_additional_features = right_data[additional_feature_columns]
+            print(f"Dimensioni left_data_filtered: {left_data_filtered.shape}, Dimensioni right_data_filtered: {right_data_filtered.shape}")
+            if args.include_additional_features:
+                print(f"Dimensioni left_additional_features: {left_additional_features.shape}, Dimensioni right_additional_features: {right_additional_features.shape}")
 
-        left_data_filtered = left_data_filtered.reindex(sorted(left_data_filtered.columns), axis=1)
-        right_data_filtered = right_data_filtered.reindex(sorted(right_data_filtered.columns), axis=1)
-        combined_joints_data = pd.concat([left_data_filtered, right_data_filtered], axis=1)
-        combined_additional_features = pd.concat([left_additional_features, right_additional_features], axis=1) if args.include_additional_features else None
-        print(f"Dimensioni combined_joints_data: {combined_joints_data.shape}")
-        if args.include_additional_features:
-            print(f"Dimensioni combined_additional_features: {combined_additional_features.shape}")
+            if len(left_data_filtered) != len(right_data_filtered):
+                raise ValueError("Il numero di frame nelle due mani non corrisponde. Controllare i file: {} e {}".format(left_csv_path, right_csv_path))
 
-    if args.single_hand:
-        num_frames = len(data_filtered)
-        num_columns = data_filtered.shape[1]
-        num_features_per_joint = num_columns // original_joints_num
-        print(f"num_frames: {num_frames}, num_columns: {num_columns}, num_features_per_joint: {num_features_per_joint}")
-        print(f"Expected size: {num_frames * original_joints_num * num_features_per_joint}, Actual size: {data_filtered.values.size}")
-        data_np = data_filtered.values.reshape((num_frames, original_joints_num, num_features_per_joint))
-        print(f"Dimensioni data_np: {data_np.shape}")
-    else:
-        num_frames = len(combined_joints_data)
-        num_columns = combined_joints_data.shape[1]
-        num_features_per_joint = num_columns // (original_joints_num * 2)
-        print(f"num_frames: {num_frames}, num_columns: {num_columns}, num_features_per_joint: {num_features_per_joint}")
-        print(f"Expected size: {num_frames * original_joints_num * 2 * num_features_per_joint}, Actual size: {combined_joints_data.values.size}")
-        combined_joints_data_np = combined_joints_data.values.reshape((num_frames, original_joints_num * 2, num_features_per_joint))
-        print(f"Dimensioni combined_joints_data_np: {combined_joints_data_np.shape}")
+            left_data_filtered = left_data_filtered.reindex(sorted(left_data_filtered.columns), axis=1)
+            right_data_filtered = right_data_filtered.reindex(sorted(right_data_filtered.columns), axis=1)
+            combined_joints_data = pd.concat([left_data_filtered, right_data_filtered], axis=1)
+            combined_additional_features = pd.concat([left_additional_features, right_additional_features], axis=1) if args.include_additional_features else None
+            print(f"Dimensioni combined_joints_data: {combined_joints_data.shape}")
+            if args.include_additional_features:
+                print(f"Dimensioni combined_additional_features: {combined_additional_features.shape}")
 
-    # Estrai il nome del file di input senza l'estensione
-    input_filename = os.path.splitext(os.path.basename(csv_rel_path if args.single_hand else left_csv_rel_path))[0]
-    output_filename = f'{input_filename}_combined_skeleton.txt'
-    new_skel_path = os.path.join(OUTPUT_DIR, output_filename)
-    os.makedirs(os.path.dirname(new_skel_path), exist_ok=True)
-    with open(new_skel_path, 'w') as f:
-        for i in range(num_frames):
-            if args.single_hand:
-                frame_joints_flat = ' '.join(map(str, data_np[i, common_pose_joint_inds].flatten()))
-                if args.include_additional_features:
-                    additional_features_flat = ' '.join(map(str, additional_features_data.iloc[i]))
-                    f.write(frame_joints_flat + ' ' + additional_features_flat + '\n')
+        if args.single_hand:
+            num_frames = len(data_filtered)
+            num_columns = data_filtered.shape[1]
+            num_features_per_joint = num_columns // original_joints_num
+            print(f"num_frames: {num_frames}, num_columns: {num_columns}, num_features_per_joint: {num_features_per_joint}")
+            print(f"Expected size: {num_frames * original_joints_num * num_features_per_joint}, Actual size: {data_filtered.values.size}")
+            data_np = data_filtered.values.reshape((num_frames, original_joints_num, num_features_per_joint))
+            print(f"Dimensioni data_np: {data_np.shape}")
+        else:
+            num_frames = len(combined_joints_data)
+            num_columns = combined_joints_data.shape[1]
+            num_features_per_joint = num_columns // (original_joints_num * 2)
+            print(f"num_frames: {num_frames}, num_columns: {num_columns}, num_features_per_joint: {num_features_per_joint}")
+            print(f"Expected size: {num_frames * original_joints_num * 2 * num_features_per_joint}, Actual size: {combined_joints_data.values.size}")
+            combined_joints_data_np = combined_joints_data.values.reshape((num_frames, original_joints_num * 2, num_features_per_joint))
+            print(f"Dimensioni combined_joints_data_np: {combined_joints_data_np.shape}")
+
+        # Estrai il nome del file di input senza l'estensione
+        input_filename = os.path.splitext(os.path.basename(csv_rel_path if args.single_hand else left_csv_rel_path))[0]
+        output_filename = f'{input_filename}_combined_skeleton.txt'
+        new_skel_path = os.path.join(OUTPUT_DIR, output_filename)
+        os.makedirs(os.path.dirname(new_skel_path), exist_ok=True)
+        with open(new_skel_path, 'w') as f:
+            for i in range(num_frames):
+                if args.single_hand:
+                    frame_joints_flat = ' '.join(map(str, data_np[i, common_pose_joint_inds].flatten()))
+                    if args.include_additional_features:
+                        additional_features_flat = ' '.join(map(str, additional_features_data.iloc[i]))
+                        f.write(frame_joints_flat + ' ' + additional_features_flat + '\n')
+                    else:
+                        f.write(frame_joints_flat + '\n')
                 else:
-                    f.write(frame_joints_flat + '\n')
-            else:
-                frame_joints_flat = ' '.join(map(str, combined_joints_data_np[i, common_pose_joint_inds].flatten()))
-                if combined_additional_features is not None:
-                    additional_features_flat = ' '.join(map(str, combined_additional_features.iloc[i]))
-                    f.write(frame_joints_flat + ' ' + additional_features_flat + '\n')
-                else:
-                    f.write(frame_joints_flat + '\n')
+                    frame_joints_flat = ' '.join(map(str, combined_joints_data_np[i, common_pose_joint_inds].flatten()))
+                    if combined_additional_features is not None:
+                        additional_features_flat = ' '.join(map(str, combined_additional_features.iloc[i]))
+                        f.write(frame_joints_flat + ' ' + additional_features_flat + '\n')
+                    else:
+                        f.write(frame_joints_flat + '\n')
 
-    print(f"Dati combinati salvati in: {new_skel_path}")
+        print(f"Dati combinati salvati in: {new_skel_path}")
 
-    OUTPUT_FILE = './dataset_scripts/myDataset/tot_annotations.txt'
-    os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
-    with open(OUTPUT_FILE, 'a') as store:
+        # Scrivi il percorso del nuovo file di scheletro e l'etichetta nel file di annotazioni
         store.write(f'{new_skel_path} {label}\n')
 
 print("Conversione completata e file di annotazioni generati con successo.")

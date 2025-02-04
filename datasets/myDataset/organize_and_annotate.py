@@ -70,6 +70,7 @@ def generate_annotation_file(organized_data_path, annotation_file_path):
                 print(f"Azione non trovata nel dizionario: {action}. Saltata.")
                 continue
             
+            
             # Scansiona le sottocartelle (dx/sx)
             for hand_folder in os.listdir(action_path):
                 hand_path = os.path.join(action_path, hand_folder)

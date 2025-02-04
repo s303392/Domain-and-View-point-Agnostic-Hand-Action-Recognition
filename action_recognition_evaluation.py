@@ -556,7 +556,7 @@ if __name__ == '__main__':
     
     # myDATASET
     if args.my_actions and args.reference_actions:
-        action_mapping_file_path = 'C:/Users/filip/Desktop/Politecnico/INGEGNERIA/TESI_loc/Sabater/Domain-and-View-point-Agnostic-Hand-Action-Recognition/datasets/SHREC2017/data_action_recognition.txt'
+        action_mapping_file_path = 'C:/Users/filip/Desktop/Politecnico/INGEGNERIA/TESI_loc/Sabater/Domain-and-View-point-Agnostic-Hand-Action-Recognition/datasets/myDataset/data_action_recognition.txt'
         action_mapping = create_action_mapping(action_mapping_file_path)
 
         OUTPUT_FILE = './myDatasetClassification_CD_result.txt'
