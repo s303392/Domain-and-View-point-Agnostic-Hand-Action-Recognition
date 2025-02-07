@@ -13,6 +13,7 @@ import numpy as np
 from tqdm import tqdm
 import time
 import sys
+import pandas as pd
 
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score
@@ -294,6 +295,20 @@ def create_action_mapping(file_path):
 def get_action_name(action_mapping, action_number):
     return action_mapping.get(action_number, "Unknown")
 
+def save_embeddings_to_csv(embs, labels, output_path="embeddings.csv"):
+    """
+    Salva gli embeddings e le loro etichette in un file CSV.
+
+    :param embs: array numpy con gli embeddings.
+    :param labels: array numpy con le etichette delle azioni.
+    :param output_path: percorso del file CSV in cui salvare i dati.
+    """
+    df = pd.DataFrame(embs)
+    df["label"] = labels  # Aggiungiamo una colonna con le etichette
+    df.to_csv(output_path, index=False)
+    print(f"EMBEDDINGS SALVATI IN {output_path}")
+    print(f"Shape degli embeddings: {embs.shape}")
+    print(f"Shape delle etichette: {labels.shape}")
 
 # SINGLE MY ACTION 
 
@@ -377,13 +392,23 @@ def evaluate_my_actions(model, model_params, my_actions_file, reference_actions_
     my_annotations, my_labels = load_annotations(my_actions_file)
     my_embs, my_embs_aug = get_embeddings_dataset(model, my_annotations, model_params)
 
+    # Salva gli embeddings di riferimento in un CSV
+    save_embeddings_to_csv(reference_embs, reference_labels, output_path="reference_embeddings.csv")
+
+    # Salva gli embeddings delle tue registrazioni in un CSV
+    save_embeddings_to_csv(my_embs, my_labels, output_path="my_embeddings.csv")
+
     print(f"Lunghezza ref_embs: {len(reference_embs)}")
     print(f"Lunghezza my_embs: {len(my_embs)}")
     
     if ref_embs_aug is not None:
         print(f"Lunghezza ref_embs_aug: {len(ref_embs_aug)}")
+        for i, aug_emb in enumerate(ref_embs_aug):
+            print(f"Shape di ref_embs_aug[{i}]: {aug_emb.shape}")
     if my_embs_aug is not None:
         print(f"Lunghezza my_embs_aug: {len(my_embs_aug)}")
+        for i, aug_emb in enumerate(my_embs_aug):
+            print(f"Shape di my_embs_aug[{i}]: {aug_emb.shape}")
 
     total_acc = 0
     num_evaluations = 0
