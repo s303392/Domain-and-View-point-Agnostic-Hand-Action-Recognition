@@ -22,6 +22,8 @@ def organize_files(raw_data_path, organized_data_path):
     if not os.path.exists(organized_data_path):
         os.makedirs(organized_data_path)
     
+    moved_files = []
+    
     # Scansiona tutti i file nella cartella non strutturata
     for file_name in os.listdir(raw_data_path):
         if file_name.endswith(".csv"):
@@ -49,40 +51,36 @@ def organize_files(raw_data_path, organized_data_path):
             src_file = os.path.join(raw_data_path, file_name)
             dst_file = os.path.join(hand_dir, file_name)
             shutil.move(src_file, dst_file)
+            moved_files.append((action, hand_folder, file_name))
             print(f"File spostato: {src_file} -> {dst_file}")
     
     print("Organizzazione completata.\n")
+    return moved_files
 
-def generate_annotation_file(organized_data_path, annotation_file_path):
+def generate_annotation_file(organized_data_path, annotation_file_path, moved_files):
     """
     Genera il file annotation_file.txt con percorsi e label.
     """
     print(f"Generando il file di annotazione: {annotation_file_path}")
-    with open(annotation_file_path, "w") as annotation_file:
-        # Scansiona la struttura organizzata
-        for action in os.listdir(organized_data_path):
-            action_path = os.path.join(organized_data_path, action)
-            if not os.path.isdir(action_path):
-                continue
-            
+    
+    existing_annotations = set()
+    if os.path.exists(annotation_file_path):
+        with open(annotation_file_path, "r") as annotation_file:
+            for line in annotation_file:
+                existing_annotations.add(line.strip())
+    
+    with open(annotation_file_path, "a") as annotation_file:
+        for action, hand_folder, file_name in moved_files:
             label = ACTION_LABELS.get(action, None)
             if label is None:
                 print(f"Azione non trovata nel dizionario: {action}. Saltata.")
                 continue
             
-            
-            # Scansiona le sottocartelle (dx/sx)
-            for hand_folder in os.listdir(action_path):
-                hand_path = os.path.join(action_path, hand_folder)
-                if not os.path.isdir(hand_path):
-                    continue
-                
-                # Aggiungi ogni file CSV al file di annotazione
-                for file_name in os.listdir(hand_path):
-                    if file_name.endswith(".csv"):
-                        relative_path = os.path.join("MANUS_data", action, hand_folder, file_name).replace('\\', '/')  # Aggiungi "MANUS_data" e sostituisci le barre inverse con barre normali
-                        annotation_file.write(f"{relative_path} {label}\n")
-                        print(f"Aggiunto al file di annotazione: {relative_path} {label}")
+            relative_path = os.path.join("MANUS_data", action, hand_folder, file_name).replace('\\', '/')
+            annotation_entry = f"{relative_path} {label}"
+            if annotation_entry not in existing_annotations:
+                annotation_file.write(f"{annotation_entry}\n")
+                print(f"Aggiunto al file di annotazione: {annotation_entry}")
     
     print(f"File di annotazione generato: {annotation_file_path}\n")
 
@@ -95,10 +93,10 @@ def main():
     args = parser.parse_args()
 
     # Organizza i file CSV nella struttura gerarchica
-    organize_files(args.raw_data, args.organized_data)
+    moved_files = organize_files(args.raw_data, args.organized_data)
     
     # Genera il file annotation_file.txt
-    generate_annotation_file(args.organized_data, args.annotation_file)
+    generate_annotation_file(args.organized_data, args.annotation_file, moved_files)
 
 if __name__ == "__main__":
     main()

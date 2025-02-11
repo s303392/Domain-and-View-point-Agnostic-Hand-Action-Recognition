@@ -393,22 +393,22 @@ def evaluate_my_actions(model, model_params, my_actions_file, reference_actions_
     my_embs, my_embs_aug = get_embeddings_dataset(model, my_annotations, model_params)
 
     # Salva gli embeddings di riferimento in un CSV
-    save_embeddings_to_csv(reference_embs, reference_labels, output_path="reference_embeddings.csv")
+    save_embeddings_to_csv(reference_embs, reference_labels, output_path="./results/embeddings/reference_embeddings.csv")
 
     # Salva gli embeddings delle tue registrazioni in un CSV
-    save_embeddings_to_csv(my_embs, my_labels, output_path="my_embeddings.csv")
+    save_embeddings_to_csv(my_embs, my_labels, output_path="./results/embeddings/my_embeddings.csv")
 
     print(f"Lunghezza ref_embs: {len(reference_embs)}")
     print(f"Lunghezza my_embs: {len(my_embs)}")
     
     if ref_embs_aug is not None:
         print(f"Lunghezza ref_embs_aug: {len(ref_embs_aug)}")
-        for i, aug_emb in enumerate(ref_embs_aug):
-            print(f"Shape di ref_embs_aug[{i}]: {aug_emb.shape}")
+        # for i, aug_emb in enumerate(ref_embs_aug):
+        #     print(f"Shape di ref_embs_aug[{i}]: {aug_emb.shape}")
     if my_embs_aug is not None:
         print(f"Lunghezza my_embs_aug: {len(my_embs_aug)}")
-        for i, aug_emb in enumerate(my_embs_aug):
-            print(f"Shape di my_embs_aug[{i}]: {aug_emb.shape}")
+        # for i, aug_emb in enumerate(my_embs_aug):
+        #     print(f"Shape di my_embs_aug[{i}]: {aug_emb.shape}")
 
     total_acc = 0
     num_evaluations = 0
@@ -567,46 +567,53 @@ if __name__ == '__main__':
     parser.add_argument('--reference_actions', type=str, help='path to the annotation file for reference actions')
     args = parser.parse_args()
 
-    model, model_params = prediction_utils.load_model(args.path_model, False, loss_name = args.loss_name)
+    model, model_params = prediction_utils.load_model(args.path_model, False, loss_name=args.loss_name)
     model_params['use_rotations'] = None
     
     print('* Model loaded')
 
-    # model.build((None, abs(model_params['max_seq_len']), model_params['num_feats']))
-    # model.summary()
-
     print_model_details(model_params)
     
-    # %%
+    # Carica i dati di riferimento se specificati
+    if args.reference_actions:
+        reference_annotations, reference_labels = load_annotations(args.reference_actions)
+        reference_embs, ref_embs_aug = get_embeddings_dataset(model, reference_annotations, model_params)
+        print(f"Lunghezza reference_embs: {len(reference_embs)}")
     
     # myDATASET
     if args.my_actions and args.reference_actions:
         action_mapping_file_path = 'C:/Users/filip/Desktop/Politecnico/INGEGNERIA/TESI_loc/Sabater/Domain-and-View-point-Agnostic-Hand-Action-Recognition/datasets/myDataset/data_action_recognition.txt'
         action_mapping = create_action_mapping(action_mapping_file_path)
 
-        OUTPUT_FILE = './myDatasetClassification_CD_result.txt'
+        OUTPUT_FILE = './results/classification/cross-domain/myDatasetClassification_CDAug_mod.txt'
         evaluate_my_actions(model, model_params, args.my_actions, args.reference_actions, action_mapping, OUTPUT_FILE)
 
     # SINGLE MY ACTION
     if args.single_action:
-        file_path = ''
+        file_path = 'C:/Users/filip/Desktop/Politecnico/INGEGNERIA/TESI_loc/Sabater/Domain-and-View-point-Agnostic-Hand-Action-Recognition/datasets/F-PHAB/data_split_action_recognition.txt'
         a_mapping = create_action_mapping(file_path)
 
         single_action_sequences, single_action_labels = load_single_action_data(args.single_action, model_params)
         single_action_embs = get_embeddings(model, single_action_sequences)
-       
 
-        #Carico i dati reference di F-PHAB e calcolo i rispettivi embeddings
-        total_annotations, total_labels, folds_1_1, folds_base, folds_subject = load_fphab_data()
-        action_sequences, action_sequences_augmented = load_actions_sequences_data_gen(total_annotations, num_augmentations, model_params)
-        embs, embs_aug = get_tcn_embeddings(model, action_sequences, action_sequences_augmented)
-
-        if num_augmentations > 0 and embs_aug is not None:
-            combined_embs = np.concatenate(embs_aug, axis=0)
-            combined_labels = np.concatenate([total_labels for _ in range(num_augmentations)], axis=0)
+        if args.reference_actions:
+            combined_embs = reference_embs
+            combined_labels = reference_labels
+            if num_augmentations > 0 and ref_embs_aug is not None:
+                combined_embs = np.concatenate([reference_embs] + ref_embs_aug, axis=0)
+                combined_labels = np.concatenate([reference_labels for _ in range(num_augmentations + 1)], axis=0)
         else:
-            combined_embs = embs
-            combined_labels = total_labels
+            # Carico i dati reference di F-PHAB e calcolo i rispettivi embeddings
+            total_annotations, total_labels, folds_1_1, folds_base, folds_subject = load_fphab_data()
+            action_sequences, action_sequences_augmented = load_actions_sequences_data_gen(total_annotations, num_augmentations, model_params)
+            embs, embs_aug = get_tcn_embeddings(model, action_sequences, action_sequences_augmented)
+
+            if num_augmentations > 0 and embs_aug is not None:
+                combined_embs = np.concatenate([embs] + embs_aug, axis=0)
+                combined_labels = np.concatenate([total_labels for _ in range(num_augmentations + 1)], axis=0)
+            else:
+                combined_embs = embs
+                combined_labels = total_labels
 
         print('Len single_action_embs:{}', len(single_action_embs))
         print('Len label:{}', len(single_action_labels))
@@ -614,10 +621,9 @@ if __name__ == '__main__':
         # Valuto la singola azione
         acc, preds, true_labels = evaluate_single_action(single_action_embs, single_action_labels, combined_embs, combined_labels)
         print(f"Accuratezza: {acc}")
-        #pred_action_name = get_action_name(a_mapping, int(preds[0]))
-        #true_action_name = get_action_name(a_mapping, int(true_labels[0]))
-        #print(f"Predizione: {pred_action_name}, Etichetta corretta: {true_action_name}")
-        print(f"Predizione: {preds}, Etichetta corretta: {true_labels}")
+        pred_action_name = get_action_name(a_mapping, int(preds[0]))
+        true_action_name = get_action_name(a_mapping, int(true_labels[0]))
+        print(f"Predizione: {pred_action_name}, Etichetta corretta: {true_action_name}")
 
     # F-PHAB
     if args.eval_fphab:

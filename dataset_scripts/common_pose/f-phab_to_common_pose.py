@@ -16,7 +16,7 @@ if joints_num == 20:
                         [ '{}{}'.format(finger, part) for finger in  ['I', 'M', 'R', 'P' ] \
                          for part in ['MCP', 'PIP', 'DIP', 'TIP'] ]
 
-common_pose_joint_inds = [ fp_joints[s] for s in common_pose_joints ]
+common_pose_joint_inds = [ fp_joints[s] for s in common_pose_joints ] 
 
 # Percorsi dei dataset
 common_pose_dataset_path = 'C:/Users/filip/Desktop/Politecnico/INGEGNERIA/TESI_loc/Sabater/Domain-and-View-point-Agnostic-Hand-Action-Recognition/datasets/common_pose/'

@@ -111,14 +111,32 @@ class TCN_Att(Model):
         
        
     # calcola la media pesata delle sequenze utilizzando il meccanismo di attenzione
+    # def compute_weighted_average(self, x):
+    #     mean_weights = self.att_dense(x)
+        
+    #     mean_weights = mean_weights / tf.linalg.norm(mean_weights, ord=1, axis=1, keepdims=True)
+        
+    #     x = x*mean_weights[:,:,None]
+    #     x = tf.reduce_mean(x,axis=1)
+    #     return mean_weights, x
+    
+    # MIA VERSIONE PER DARE PESO AI FRAME FINALI
     def compute_weighted_average(self, x):
         mean_weights = self.att_dense(x)
         
+        # Creiamo una pesatura che dia più importanza ai frame finali
+        seq_len = tf.shape(mean_weights)[1]
+        time_weights = tf.linspace(0.5, 1.5, seq_len)  # I frame finali avranno più peso
+        
+        mean_weights = mean_weights * time_weights[None, :]
+        
+        # Normalizziamo i pesi per mantenere la somma a 1
         mean_weights = mean_weights / tf.linalg.norm(mean_weights, ord=1, axis=1, keepdims=True)
         
-        x = x*mean_weights[:,:,None]
-        x = tf.reduce_mean(x,axis=1)
+        x = x * mean_weights[:, :, None]
+        x = tf.reduce_mean(x, axis=1)
         return mean_weights, x
+
     
     #esegue il forward pass del modello, applicando l'encoder TCN,
     # i blocchi di rappresentazione e attenzione, e normalizzando l'output

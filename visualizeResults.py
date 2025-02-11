@@ -57,7 +57,8 @@ def plot_classification_report(predictions, labels):
     plt.title('Classification Report')
 
 if __name__ == "__main__":
-    file_path = './myDatasetClassification_CD_result.txt'
+    #file_path = './results/classification/cross-domain/myDatasetClassification_CDAug_fin.txt'
+    file_path = './results/classification/cross-domain/myDatasetClassification_CD_fin.txt'
     accuracies, predictions, labels = parse_results(file_path)
 
     plot_confusion_matrix(predictions, labels)

@@ -148,7 +148,7 @@ def visualize_poses(file_path_1, file_path_2, animate=False):
 f_phab = './datasets/common_pose/F-PHAB/Subject3_putsalt_1_val_jn20.txt'
 shrec = './datasets/common_pose/SHREC2017/gesture1_finger2_subject10_essai4_train_jn20.txt'
 myShrec = './datasets/common_pose/mySHREC-17/grab04_LucaTracker_R_combined_skeleton.txt'
-myDataset = './datasets/common_pose/myDataset/screw_dx_Luca030_31-01_LucaTracker_R_combined_skeleton.txt'
+myDataset = './datasets/common_pose/myDataset/pickplace_dx_Luca021_ref_LucaTracker_R_combined_skeleton.txt'
 
 # Chiedi all'utente se vuole visualizzare l'animazione
 animate = input("Vuoi visualizzare l'animazione? (s/n): ").strip().lower() == 's'

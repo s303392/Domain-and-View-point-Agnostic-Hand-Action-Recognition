@@ -13,6 +13,7 @@ original_joints_num = 25
 common_pose_joints_num = 20
 
 # Definizione dei giunti nel formato common_pose
+common_pose_joints = []
 if common_pose_joints_num == 20:
     common_pose_joints = [ 'Wrist' ] +\
                         ['TMCP', 'TDIP', 'TTIP'] +\
@@ -43,7 +44,8 @@ with open(args.annotation_file, 'r') as annotation_file:
     lines = annotation_file.readlines()
 
 # File di annotazioni di output
-OUTPUT_FILE = './dataset_scripts/myDataset/tot_annotations.txt'
+#OUTPUT_FILE = './dataset_scripts/myDataset/ref_ComPose_annotations.txt'
+OUTPUT_FILE = './dataset_scripts/myDataset/test_ComPose_annotations.txt'
 os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
 
 # Apri il file di annotazioni in modalità di scrittura una volta
@@ -58,7 +60,6 @@ with open(OUTPUT_FILE, 'w') as store:
                 sep=';',
                 decimal=',', 
                 encoding='utf-8',
-                error_bad_lines=False  
                 )
             print(f"Caricati dati CSV: {csv_path}")
             print(f"Dimensioni data: {data.shape}")
@@ -86,10 +87,10 @@ with open(OUTPUT_FILE, 'w') as store:
             feature_columns_per_joint += velocity_acceleration_features
 
         if args.single_hand:
-            feature_columns = [col for col in data.columns if any(feature in col for feature in feature_columns_per_joint)]
-            additional_feature_columns = [col for col in data.columns if any(feature in col for feature in additional_features)] if args.include_additional_features else []
+            feature_columns = [col for col in data.columns if any(feature in col for feature in feature_columns_per_joint)] 
+            additional_feature_columns = [col for col in data.columns if any(feature in col for feature in additional_features)] if args.include_additional_features else [] # type: ignore
             data_filtered = data[feature_columns]
-            additional_features_data = data[additional_feature_columns]
+            additional_features_data = data[additional_feature_columns] 
             print(f"Dimensioni data_filtered: {data_filtered.shape}")
             if args.include_additional_features:
                 print(f"Dimensioni additional_features_data: {additional_features_data.shape}")

@@ -1,0 +1,22 @@
+Sample 0: True Label: grab_H, Predicted: tap_H 
+ Sample 1: True Label: grab_H, Predicted: tap_H 
+ Sample 2: True Label: grab_H, Predicted: tap_H 
+ Sample 3: True Label: grab_H, Predicted: tap_H 
+ Sample 4: True Label: rotation_cw_H, Predicted: swipe_right_H 
+ Sample 5: True Label: rotation_cw_H, Predicted: swipe_right_H 
+ Sample 6: True Label: rotation_cw_H, Predicted: rotation_ccw_H 
+ Sample 7: True Label: rotation_cw_H, Predicted: swipe_right_H 
+ Sample 8: True Label: rotation_ccw_H, Predicted: swipe_down_F 
+ Sample 9: True Label: rotation_ccw_H, Predicted: tap_H 
+ Sample 10: True Label: rotation_ccw_H, Predicted: tap_H 
+ Sample 11: True Label: rotation_ccw_H, Predicted: tap_H 
+ Sample 12: True Label: swipe_right_H, Predicted: swipe_down_H 
+ Sample 13: True Label: swipe_right_H, Predicted: swipe_left_H 
+ Sample 14: True Label: swipe_right_H, Predicted: swipe_down_H 
+ Sample 15: True Label: swipe_right_H, Predicted: swipe_down_H 
+ Sample 16: True Label: swipe_left_H, Predicted: swipe_right_H 
+ Sample 17: True Label: swipe_left_H, Predicted: swipe_right_H 
+ Sample 18: True Label: swipe_left_H, Predicted: swipe_right_F 
+ Sample 19: True Label: swipe_left_H, Predicted: swipe_right_H 
+ 
+Overall Accuracy: 0.00%
