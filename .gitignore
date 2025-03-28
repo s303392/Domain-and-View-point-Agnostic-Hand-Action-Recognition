@@ -137,4 +137,6 @@ datasets/mySHREC-17/raw_data
 datasets/common_pose/SHREC2017
 datasets/common_pose/mySHREC-17
 datasets/common_pose/myDataset
+datasets/common_pose/testSingleAction
 pretrained_models/
+temp_data

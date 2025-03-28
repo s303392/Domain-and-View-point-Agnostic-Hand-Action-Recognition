@@ -236,6 +236,173 @@ class DataGenerator():
         #body è un array di elementi che rappresentano un frame che contiene coordinate 3D 
         # delle articolazioni della mano [num_frames, joints_num, joints_dim]        
 
+
+        #IMPLEMENTO UN CAMPIONAMENTO DINAMICO PER ELABORARE SEQUENZE PIU' LUNGHE
+        def select_informative_frames(frames: np.ndarray, final_count: int = 32, skip: int = 3) -> np.ndarray:
+            """
+            Seleziona dinamicamente i frame più informativi da una sequenza di pose della mano.
+            
+            Parametri:
+            frames (np.ndarray): Array di shape [N, 7, 3] con N frame.
+            final_count (int): Numero di frame finali (ad es. 32) che, applicando lo skip, devono essere ottenuti.
+            skip (int): Fattore di skip fisso (es. 3) che porta a target_len = final_count * skip (es. 96).
+            
+            Ritorna:
+            np.ndarray: Array con target_len frame (es. 96 frame) selezionati.
+            """
+            num_frames = frames.shape[0]
+            target_len = final_count * skip  # es. 32 * 3 = 96
+            if num_frames <= target_len:
+                return frames.copy()  # Se la sequenza è corta, la restituisce così com'è.
+            
+            selected_frames = frames.copy()
+            
+            # Rimuove iterativamente i frame meno informativi
+            while selected_frames.shape[0] > target_len:
+                m = selected_frames.shape[0]
+                # Calcola la differenza frame-to-frame per ogni giunto (per frame 1..m-1)
+                diffs = np.linalg.norm(selected_frames[1:] - selected_frames[:-1], axis=2)  # shape (m-1, 7)
+                # Calcola media, mediana e massimo degli spostamenti per ogni frame (il primo frame ha 0)
+                mean_movement = np.concatenate(([0.0], diffs.mean(axis=1)))
+                median_movement = np.concatenate(([0.0], np.median(diffs, axis=1)))
+                max_movement = np.concatenate(([0.0], diffs.max(axis=1)))
+                # Punteggio: combina la media con la differenza tra il massimo e la mediana
+                scores = mean_movement + (max_movement - median_movement)
+                # Trova l'indice con il punteggio minore (meno dinamico)
+                min_index = np.argmin(scores)
+                selected_frames = np.delete(selected_frames, min_index, axis=0)
+                
+            print(f"[select_informative_frames] Numero di frame finali: {selected_frames.shape[0]}")
+            return selected_frames
+
+        def select_active_segment(frames: np.ndarray, target_len: int, threshold_ratio: float = 0.3, smoothing_window: int = 5) -> np.ndarray:
+            """
+            Seleziona l'intervallo attivo della sequenza, in cui il movimento supera una soglia.
+            
+            Parametri:
+            frames (np.ndarray): Array di shape [N, 7, 3] con N frame.
+            target_len (int): Lunghezza desiderata dell'intervallo attivo (ad es. 96 frame).
+            threshold_ratio (float): Rapporto per definire la soglia rispetto al valore massimo di movimento.
+            smoothing_window (int): Dimensione della finestra per la media mobile.
+            
+            Ritorna:
+            np.ndarray: L'intervallo attivo selezionato.
+            """
+            num_frames = frames.shape[0]
+            if num_frames == 0:
+                return frames
+            
+            # Calcola l'envelope del movimento: norma della differenza tra frame consecutivi
+            movement = np.linalg.norm(np.diff(frames, axis=0), axis=(1,2))
+            movement = np.insert(movement, 0, 0.0)  # Per avere lo stesso numero di valori dei frame
+
+            # Applica una media mobile per smussare l'envelope
+            kernel = np.ones(smoothing_window) / smoothing_window
+            smoothed = np.convolve(movement, kernel, mode='same')
+            
+            # Definisce una soglia come una frazione del valore massimo dell'envelope smussato
+            thresh = threshold_ratio * smoothed.max()
+            
+            # Seleziona gli indici in cui il movimento supera la soglia
+            active_indices = np.where(smoothed >= thresh)[0]
+            print(f"[select_active_segment] Indici attivi: {active_indices}")
+            
+            if active_indices.size == 0:
+                # Se nessun frame supera la soglia, usa una finestra centrata sul picco
+                peak_index = np.argmax(smoothed)
+                start = max(0, peak_index - target_len // 2)
+                end = start + target_len
+                print(f"[select_active_segment] Nessun frame supera la soglia, seleziono una finestra centrata sul picco: start={start}, end={end}")
+            else:
+                # Seleziona il blocco contiguo di indici con la maggiore lunghezza
+                diffs = np.diff(active_indices)
+                breaks = np.where(diffs > 1)[0]
+                segments = []
+                start_idx = active_indices[0]
+                for b in breaks:
+                    end_idx = active_indices[b]
+                    segments.append((start_idx, end_idx))
+                    start_idx = active_indices[b+1]
+                segments.append((start_idx, active_indices[-1]))
+                # Scegli il segmento più lungo
+                seg = max(segments, key=lambda x: x[1] - x[0])
+                # Centra una finestra di target_len attorno al centro del segmento
+                seg_center = (seg[0] + seg[1]) // 2
+                start = max(0, seg_center - target_len // 2)
+                end = start + target_len
+                print(f"[select_active_segment] Segmento più lungo: {seg}, Centro segmento: {seg_center}, start={start}, end={end}")
+
+            # Assicura che l'intervallo non ecceda la lunghezza totale
+            if end > num_frames:
+                end = num_frames
+                start = max(0, end - target_len)
+            
+            return frames[start:end]
+
+        def select_informative_active_frames(frames: np.ndarray, final_count: int = 32, skip: int = 3,
+                                            threshold_ratio: float = 0.3, smoothing_window: int = 5) -> np.ndarray:
+            """
+            Combina la selezione dell'intervallo attivo e il dynamic sampling.
+            
+            Passaggi:
+            1. Seleziona l'intervallo attivo in cui il movimento è significativo, ottenendo target_len frame (target_len = final_count * skip, es. 96).
+            2. Applica il dynamic sampling all'interno dell'intervallo attivo per rimuovere iterativamente i frame meno informativi.
+            
+            Ritorna:
+            np.ndarray: Sequenza di frame (di lunghezza target_len) pronta per lo skip successivo.
+            """
+            target_len = final_count * skip
+            # 1. Seleziona l'intervallo attivo
+            active_segment = select_active_segment(frames, target_len=target_len,
+                                                threshold_ratio=threshold_ratio,
+                                                smoothing_window=smoothing_window)
+            # Se l'intervallo attivo è più lungo del target, applica il dynamic sampling
+            if active_segment.shape[0] > target_len:
+                #NON CI ENTRA MAI
+                active_segment = select_informative_frames(active_segment, final_count=final_count, skip=skip)
+            # Se invece l'intervallo attivo è più corto, qui puoi decidere se padderlo o usarlo come è (a seconda del tuo flusso)
+            return active_segment
+        
+        #SOLUZIONE SLIDING_WINDOW
+        def select_central_movement_segment(frames: np.ndarray, target_length: int = 96) -> np.ndarray:
+            """
+            Seleziona il segmento centrale della sequenza, cioè la finestra di lunghezza target_length
+            in cui il movimento cumulativo (misurato come la norma delle differenze tra frame consecutivi)
+            è massimo.
+            
+            Parametri:
+            frames (np.ndarray): Sequenza di pose, shape [num_frames, 7, 3].
+            target_length (int): Numero di frame da prelevare, es. 96.
+            
+            Ritorna:
+            np.ndarray: Il segmento selezionato, di lunghezza target_length.
+            """
+            num_frames = frames.shape[0]
+            if num_frames <= target_length:
+                return frames.copy()  # Se la sequenza è già corta, restituisce tutto.
+            
+            # Calcola l'envelope del movimento: differenza frame-to-frame per tutti i giunti
+            # e ne calcola la norma complessiva per ogni frame.
+            movement = np.linalg.norm(np.diff(frames, axis=0), axis=(1,2))
+            # Inserisci un 0 per il primo frame per avere un array di lunghezza num_frames
+            movement = np.insert(movement, 0, 0.0)
+            
+            # Calcola la somma del movimento per ogni finestra di target_length frame
+            window_sums = []
+            for start in range(num_frames - target_length + 1):
+                window_sum = np.sum(movement[start : start + target_length])
+                window_sums.append(window_sum)
+            
+            # Trova l'indice di partenza della finestra con la somma maggiore
+            best_start = np.argmax(window_sums)
+            selected_segment = frames[best_start : best_start + target_length]
+            
+            print(f"Segmento selezionato da indice {best_start} a {best_start + target_length - 1}")
+            return selected_segment
+        
+        #body = select_informative_active_frames(body)
+        body = select_central_movement_segment(body)
+
 # =============================================================================
 # DATA AUGMENTATION
 #   Skip frames, temporal scaling, sequence cropping, 

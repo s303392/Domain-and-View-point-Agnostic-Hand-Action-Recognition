@@ -28,7 +28,6 @@ def organize_files(raw_data_path, organized_data_path):
     for file_name in os.listdir(raw_data_path):
         if file_name.endswith(".csv"):
             # Estrai informazioni dal nome del file
-            # Nome file esempio: pickplace_dx_Luca001_30-01_LucaTracker_R.csv
             parts = file_name.replace(".csv", "").split("_")
             if len(parts) < 4:
                 print(f"Nome file non valido: {file_name}. Saltato.")

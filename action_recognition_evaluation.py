@@ -23,11 +23,11 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 #file progettato per valutare le prestazioni del modello.
 
-knn_neighbors = [1,3,5,7,9,11]
+knn_neighbors = [1,3,5,9,11]
 # aug_loop = [0,10,20,40]
 aug_loop = [0,40]
-num_augmentations = max(aug_loop)
-#num_augmentations = 0
+#num_augmentations = max(aug_loop)
+num_augmentations = 0
 #num_augmentations: si riferisce al numero di versioni augmentate 
 # delle sequenze di azioni originali 
 weights = 'distance'
@@ -357,14 +357,14 @@ def get_embeddings(model, action_sequences):
     embs = model.get_embedding(action_sequences)
     return embs
 
-def evaluate_single_action(single_embs, single_labels, reference_embs, reference_labels):
+def evaluate_single_action(single_embs, single_labels, reference_embs, reference_labels, knn_value):
     # combined_embs = np.concatenate([reference_embs, single_embs], axis=0)
     # combined_labels = np.concatenate([reference_labels, single_labels], axis=0)
 
     # print(f"Len combined_embs_0: {len(combined_embs)}")
     # print(f"Len combined_labels_0: {len(combined_labels)}")
 
-    knn = KNeighborsClassifier(n_neighbors=5, n_jobs=8, weights='distance').fit(reference_embs, reference_labels)
+    knn = KNeighborsClassifier(n_neighbors=knn_value, n_jobs=8, weights='distance').fit(reference_embs, reference_labels)
     preds = knn.predict(single_embs)
     acc = accuracy_score(single_labels, preds)
     return acc, preds, single_labels
@@ -378,71 +378,89 @@ def load_annotations(annotation_file):
     labels = np.array([int(line.strip().split()[1]) for line in lines])
     return annotations, labels
 
-def get_embeddings_dataset(model, annotations, model_params):
+def get_embeddings_dataset(model, annotations, model_params, save_path):
     action_sequences, action_sequences_augmented = load_actions_sequences_data_gen(annotations, num_augmentations, model_params)
     embs, embs_aug = get_tcn_embeddings(model, action_sequences, action_sequences_augmented)
+    # Salva i dati di embs in un file
+    with open(save_path, 'wb') as f:
+        pickle.dump((embs, embs_aug), f)
+    print(f"Embeddings salvati in {save_path}")
     return embs, embs_aug
 
-def evaluate_my_actions(model, model_params, my_actions_file, reference_actions_file, action_mapping, output_file):
+def load_embeddings(save_path):
+    # Carica i dati di embs dal file
+    with open(save_path, 'rb') as f:
+        embs, embs_aug = pickle.load(f)
+    print(f"Embeddings caricati da {save_path}")
+    
+    return embs, embs_aug
+
+def evaluate_my_actions(model, model_params, my_actions_file, reference_actions_file, action_mapping, output_dir,name_dir, knn_values):
+    # Crea la cartella per i risultati se non esiste
+    results_dir = os.path.join(output_dir, name_dir)
+    embeddings_dir = os.path.join('./results/embeddings', name_dir)
+    if not os.path.exists(results_dir):
+        os.makedirs(results_dir)
+    if not os.path.exists(embeddings_dir):
+        os.makedirs(embeddings_dir)
+
     # Carica i dati di riferimento
     reference_annotations, reference_labels = load_annotations(reference_actions_file)
-    reference_embs, ref_embs_aug = get_embeddings_dataset(model, reference_annotations, model_params)
+    reference_embs, ref_embs_aug = get_embeddings_dataset(model, reference_annotations, model_params, "ref_embs.pkl")
 
     # Carica le tue registrazioni
     my_annotations, my_labels = load_annotations(my_actions_file)
-    my_embs, my_embs_aug = get_embeddings_dataset(model, my_annotations, model_params)
+    my_embs, my_embs_aug = get_embeddings_dataset(model, my_annotations, model_params, "my_embs.pkl")
 
     # Salva gli embeddings di riferimento in un CSV
-    save_embeddings_to_csv(reference_embs, reference_labels, output_path="./results/embeddings/reference_embeddings.csv")
+    save_embeddings_to_csv(reference_embs, reference_labels, output_path=os.path.join(embeddings_dir, f"reference_embeddings.csv"))
 
     # Salva gli embeddings delle tue registrazioni in un CSV
-    save_embeddings_to_csv(my_embs, my_labels, output_path="./results/embeddings/my_embeddings.csv")
+    save_embeddings_to_csv(my_embs, my_labels, output_path=os.path.join(embeddings_dir, f"my_embeddings.csv"))
 
     print(f"Lunghezza ref_embs: {len(reference_embs)}")
     print(f"Lunghezza my_embs: {len(my_embs)}")
     
     if ref_embs_aug is not None:
         print(f"Lunghezza ref_embs_aug: {len(ref_embs_aug)}")
-        # for i, aug_emb in enumerate(ref_embs_aug):
-        #     print(f"Shape di ref_embs_aug[{i}]: {aug_emb.shape}")
     if my_embs_aug is not None:
         print(f"Lunghezza my_embs_aug: {len(my_embs_aug)}")
-        # for i, aug_emb in enumerate(my_embs_aug):
-        #     print(f"Shape di my_embs_aug[{i}]: {aug_emb.shape}")
 
-    total_acc = 0
-    num_evaluations = 0
+    for knn_value in knn_values:
+        total_acc = 0
+        num_evaluations = 0
+        output_file = os.path.join(results_dir, f"myDatasetClassification_knn{knn_value}.txt")
 
-    with open(output_file, 'w') as f:
-        if my_embs_aug is not None:
-            for aug_idx, aug_embs in enumerate(my_embs_aug):
-                print(f"Valutazione delle sequenze augmentate {aug_idx + 1}")
-                acc_aug, preds_aug, true_labels_aug = evaluate_single_action(aug_embs, my_labels, reference_embs, reference_labels)
-                print(f"Accuratezza (augmentata {aug_idx + 1}): {acc_aug}")
-                total_acc += acc_aug
+        with open(output_file, 'w') as f:
+            if my_embs_aug is not None:
+                for aug_idx, aug_embs in enumerate(my_embs_aug):
+                    print(f"Valutazione delle sequenze augmentate {aug_idx + 1} con knn={knn_value}")
+                    acc_aug, preds_aug, true_labels_aug = evaluate_single_action(aug_embs, my_labels, reference_embs, reference_labels, knn_value)
+                    print(f"Accuratezza (augmentata {aug_idx + 1}): {acc_aug}")
+                    total_acc += acc_aug
+                    num_evaluations += 1
+                    f.write(f"Accuratezza (augmentata {aug_idx + 1}): {acc_aug}\n")
+                    for i in range(len(preds_aug)):
+                        pred_action_name = get_action_name(action_mapping, int(preds_aug[i]))
+                        true_action_name = get_action_name(action_mapping, int(true_labels_aug[i]))
+                        f.write(f"Predizione (augmentata {aug_idx + 1}): {pred_action_name}, Etichetta corretta: {true_action_name}\n")
+            else:
+                # Valuta le tue registrazioni utilizzando il KNN addestrato sui dati di riferimento
+                acc, preds, true_labels = evaluate_single_action(my_embs, my_labels, reference_embs, reference_labels, knn_value)
+                print(f"Accuratezza: {acc}")
+                total_acc += acc
                 num_evaluations += 1
-                f.write(f"Accuratezza (augmentata {aug_idx + 1}): {acc_aug}\n")
-                for i in range(len(preds_aug)):
-                    pred_action_name = get_action_name(action_mapping, int(preds_aug[i]))
-                    true_action_name = get_action_name(action_mapping, int(true_labels_aug[i]))
-                    f.write(f"Predizione (augmentata {aug_idx + 1}): {pred_action_name}, Etichetta corretta: {true_action_name}\n")
-        else:
-            # Valuta le tue registrazioni utilizzando il KNN addestrato sui dati di riferimento
-            acc, preds, true_labels = evaluate_single_action(my_embs, my_labels, reference_embs, reference_labels)
-            print(f"Accuratezza: {acc}")
-            total_acc += acc
-            num_evaluations += 1
-            f.write(f"Accuratezza: {acc}\n")
-            for i in range(len(preds)):
-                pred_action_name = get_action_name(action_mapping, int(preds[i]))
-                true_action_name = get_action_name(action_mapping, int(true_labels[i]))
-                f.write(f"Predizione: {pred_action_name}, Etichetta corretta: {true_action_name}\n")
+                f.write(f"Accuratezza: {acc}\n")
+                for i in range(len(preds)):
+                    pred_action_name = get_action_name(action_mapping, int(preds[i]))
+                    true_action_name = get_action_name(action_mapping, int(true_labels[i]))
+                    f.write(f"Predizione: {pred_action_name}, Etichetta corretta: {true_action_name}\n")
 
-        # Calcola l'accuratezza totale combinata
-        if num_evaluations > 0:
-            total_acc /= num_evaluations
-            print(f"ACCURATEZZA totale combinata: {total_acc}")
-            f.write(f"ACCURATEZZA totale combinata: {total_acc}\n")
+            # Calcola l'accuratezza totale combinata
+            if num_evaluations > 0:
+                total_acc /= num_evaluations
+                print(f"ACCURATEZZA totale combinata: {total_acc}")
+                f.write(f"ACCURATEZZA totale combinata: {total_acc}\n")
 
 # %%
 
@@ -575,54 +593,65 @@ if __name__ == '__main__':
     print_model_details(model_params)
     
     # Carica i dati di riferimento se specificati
-    if args.reference_actions:
-        reference_annotations, reference_labels = load_annotations(args.reference_actions)
-        reference_embs, ref_embs_aug = get_embeddings_dataset(model, reference_annotations, model_params)
-        print(f"Lunghezza reference_embs: {len(reference_embs)}")
+    # if args.reference_actions:
+    #     reference_annotations, reference_labels = load_annotations(args.reference_actions)
+        
+    #     Controlla se il file di embeddings esiste già
+    #     save_path = "reference_embs.pkl"
+    #     if os.path.exists(save_path):
+    #         reference_embs, ref_embs_aug = load_embeddings(save_path)
+    #     else:
+    #         reference_embs, ref_embs_aug = get_embeddings_dataset(model, reference_annotations, model_params, save_path)
+        
+    #     print(f"Lunghezza reference_embs: {len(reference_embs)}")
     
     # myDATASET
     if args.my_actions and args.reference_actions:
         action_mapping_file_path = 'C:/Users/filip/Desktop/Politecnico/INGEGNERIA/TESI_loc/Sabater/Domain-and-View-point-Agnostic-Hand-Action-Recognition/datasets/myDataset/data_action_recognition.txt'
         action_mapping = create_action_mapping(action_mapping_file_path)
 
-        OUTPUT_FILE = './results/classification/cross-domain/myDatasetClassification_CDAug_mod.txt'
-        evaluate_my_actions(model, model_params, args.my_actions, args.reference_actions, action_mapping, OUTPUT_FILE)
+        OUTPUT_DIR = './results/classification/cross-domain/'
+        NAME_DIR = 'CD_577_SM/'
+        evaluate_my_actions(model, model_params, args.my_actions, args.reference_actions, action_mapping, OUTPUT_DIR,NAME_DIR, knn_neighbors)
 
     # SINGLE MY ACTION
     if args.single_action:
-        file_path = 'C:/Users/filip/Desktop/Politecnico/INGEGNERIA/TESI_loc/Sabater/Domain-and-View-point-Agnostic-Hand-Action-Recognition/datasets/F-PHAB/data_split_action_recognition.txt'
+        num_augmentations = 0
+        file_path = os.path.normpath('C:/Users/filip/Desktop/Politecnico/INGEGNERIA/TESI_loc/Sabater/Domain-and-View-point-Agnostic-Hand-Action-Recognition/datasets/myDataset/data_action_recognition.txt')
         a_mapping = create_action_mapping(file_path)
 
         single_action_sequences, single_action_labels = load_single_action_data(args.single_action, model_params)
         single_action_embs = get_embeddings(model, single_action_sequences)
+        with open("./results/single_emb.pkl", 'wb') as f:
+            pickle.dump((single_action_embs), f)
+        print(f"Single embedding")
 
         if args.reference_actions:
-            combined_embs = reference_embs
-            combined_labels = reference_labels
-            if num_augmentations > 0 and ref_embs_aug is not None:
-                combined_embs = np.concatenate([reference_embs] + ref_embs_aug, axis=0)
-                combined_labels = np.concatenate([reference_labels for _ in range(num_augmentations + 1)], axis=0)
-        else:
-            # Carico i dati reference di F-PHAB e calcolo i rispettivi embeddings
-            total_annotations, total_labels, folds_1_1, folds_base, folds_subject = load_fphab_data()
-            action_sequences, action_sequences_augmented = load_actions_sequences_data_gen(total_annotations, num_augmentations, model_params)
-            embs, embs_aug = get_tcn_embeddings(model, action_sequences, action_sequences_augmented)
-
-            if num_augmentations > 0 and embs_aug is not None:
-                combined_embs = np.concatenate([embs] + embs_aug, axis=0)
-                combined_labels = np.concatenate([total_labels for _ in range(num_augmentations + 1)], axis=0)
+            reference_annotations, reference_labels = load_annotations(args.reference_actions)
+        
+            # Controlla se il file di embeddings esiste già
+            save_path = "./results/reference_embs.pkl"
+            if os.path.exists(save_path):
+                reference_embs, ref_embs_aug = load_embeddings(save_path)
+                print(f"Carico i reference embeddings")
             else:
-                combined_embs = embs
-                combined_labels = total_labels
+                reference_embs, ref_embs_aug = get_embeddings_dataset(model, reference_annotations, model_params, save_path)
+                print(f"Calcolo i reference embeddings")
+            print(f"Lunghezza reference_embs: {len(reference_embs)}")
 
         print('Len single_action_embs:{}', len(single_action_embs))
         print('Len label:{}', len(single_action_labels))
 
         # Valuto la singola azione
-        acc, preds, true_labels = evaluate_single_action(single_action_embs, single_action_labels, combined_embs, combined_labels)
+        acc, preds, true_labels = evaluate_single_action(single_action_embs, single_action_labels, reference_embs, reference_labels, knn_value=7)
         print(f"Accuratezza: {acc}")
         pred_action_name = get_action_name(a_mapping, int(preds[0]))
         true_action_name = get_action_name(a_mapping, int(true_labels[0]))
+        # Salva il risultato dell'azione riconosciuta in un file di output
+        output_action_file = os.path.normpath("./results/recognized_action.txt")
+        with open(output_action_file, "w") as f:
+            f.write(pred_action_name)
+        print(f"Azione riconosciuta salvata in {output_action_file}")
         print(f"Predizione: {pred_action_name}, Etichetta corretta: {true_action_name}")
 
     # F-PHAB

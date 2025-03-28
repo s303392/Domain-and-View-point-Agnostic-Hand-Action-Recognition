@@ -44,8 +44,8 @@ with open(args.annotation_file, 'r') as annotation_file:
     lines = annotation_file.readlines()
 
 # File di annotazioni di output
-#OUTPUT_FILE = './dataset_scripts/myDataset/ref_ComPose_annotations.txt'
-OUTPUT_FILE = './dataset_scripts/myDataset/test_ComPose_annotations.txt'
+OUTPUT_FILE = './dataset_scripts/myDataset/ref_ComPose_annotations.txt'
+#OUTPUT_FILE = './dataset_scripts/myDataset/test_ComPose_annotations.txt'
 os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
 
 # Apri il file di annotazioni in modalità di scrittura una volta
